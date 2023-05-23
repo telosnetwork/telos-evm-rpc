@@ -1,0 +1,38 @@
+import {createClient, createCluster} from "redis";
+
+export interface TelosEvmConfig {
+    chainId: number;
+    debug: boolean;
+    apiHost: string;
+    apiPort: number;
+    nodeos_read: string,
+    signer_account: string;
+    signer_permission: string;
+    signer_key: string;
+    contracts: {
+        main: string;
+    }
+    indexerWebsocketHost: string;
+    indexerWebsocketPort: number;
+    indexerWebsocketUri: string;
+    rpcWebsocketHost: string;
+    rpcWebsocketPort: number;
+    redisHost: string;
+    redisPort: number;
+    redisUser: string;
+    redisPass: string;
+    elasticNode: string;
+    elasticUser: string;
+    elasticPass: string;
+    elasticIndexPrefix: string;
+    elasticIndexVersion: string
+}
+
+/** A conventional Redis connection. */
+export type RedisClientConnection = ReturnType<typeof createClient>
+
+/** A clustered Redis connection. */
+export type RedisClusterConnection = ReturnType<typeof createCluster>
+
+/** A Redis connection, clustered or conventional. */
+export type RedisConnection = RedisClientConnection | RedisClusterConnection
