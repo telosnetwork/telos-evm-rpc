@@ -167,14 +167,35 @@ export default class TelosEVMRPC {
     }
 
     async createRedisClient(): Promise<RedisClientConnection> {
+        const maxConnectRetry = 10
+        const minConnectDelay = 100; // Milliseconds
+        const maxConnectDelay = 60000; // Milliseconds
+
         const opts: RedisClientOptions = {
-            url: `redis://${this.config.redisHost}:${this.config.redisPort}`
+            url: `redis://${this.config.redisHost}:${this.config.redisPort}`,
+            socket: {
+                connectTimeout: 5000,
+                reconnectStrategy: (retries) => {
+                    if (retries > maxConnectRetry) {
+                        console.log("Too many retries on redis. Connection Terminated");
+                        return new Error("Redis reconnect strategy, too many retries.");
+                    } else {
+                        const wait = Math.min(minConnectDelay * Math.pow(2, retries), maxConnectDelay);
+                        console.log("Redis reconnect strategy, waiting", wait, "milliseconds");
+                        return wait;
+                    }
+                }
+            }
         }
         if (this.config.redisUser && this.config.redisPass) {
             opts.username = this.config.redisUser
             opts.password = this.config.redisPass
         }
         const client = createClient(opts)
+        client.on('error', err => console.error('Redis client error', err));
+        client.on('connect', () => console.log('Redis client is connect'));
+        client.on('reconnecting', () => console.log('Redis client is reconnecting'));
+        client.on('ready', () => console.log('Redis client is ready'));
         await client.connect()
 
         return client
