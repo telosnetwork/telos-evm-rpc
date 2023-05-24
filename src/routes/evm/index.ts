@@ -26,7 +26,7 @@ import {
 	SignedTransaction,
 	Struct,
 	Transaction, Bytes, Checksum160
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00

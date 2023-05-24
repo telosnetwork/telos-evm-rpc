@@ -13,7 +13,7 @@ import {
     FetchProvider,
     Name,
     PrivateKey,
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 import {Client} from "@elastic/elasticsearch";
 import { createClient } from 'redis'
 

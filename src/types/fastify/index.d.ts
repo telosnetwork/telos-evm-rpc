@@ -1,5 +1,5 @@
 import {JsonRpc} from "eosjs";
-import {APIClient, Name, PrivateKey} from "@greymass/eosio";
+import {APIClient, Name, PrivateKey} from "@wharfkit/antelope";
 import {RedisClientType} from "redis";
 import {Client} from "@elastic/elasticsearch";
 

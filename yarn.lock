@@ -450,17 +450,6 @@
   dependencies:
     fast-json-stringify "^5.7.0"
 
-"@greymass/eosio@^0.6.4":
-  version "0.6.4"
-  resolved "https://registry.npmjs.org/@greymass/eosio/-/eosio-0.6.4.tgz"
-  integrity sha512-Wxr46tgh4J5Nm5tdTx5btJ/MZu36bZfxxCXfWRDAMfOn6FFFwgcZpY/sEv5eH9L2rCvxVrZtd2R8vPGsF/amQQ==
-  dependencies:
-    bn.js "^4.11.9"
-    brorand "^1.1.0"
-    elliptic "^6.5.4"
-    hash.js "^1.0.0"
-    tslib "^2.0.3"
-
 "@noble/hashes@1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-1.1.2.tgz#e9e035b9b166ca0af657a7848eb2718f0f22f183"
@@ -589,6 +578,17 @@
   integrity sha512-pbGXg4pGBZR1xnpTViAe94NJnBD0FO7PthkbKPms+9ZUmxVb4TYp+ztPWEqSEAgyp4wtchraU17tzNBGFzAofg==
   dependencies:
     "@types/node" "*"
+
+"@wharfkit/antelope@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@wharfkit/antelope/-/antelope-0.7.0.tgz#d302d5cc5a6ee499cfffa9ee850af1f0a5aaf5ab"
+  integrity sha512-R7rPkJvZkGcI25jpn5t/d9rlXhBGAwgtIFeTxeJpZjF+rGyvOxuFKdpFK1lQkcOD8MMVBGkHOy6bVUwLBX61UQ==
+  dependencies:
+    bn.js "^4.11.9"
+    brorand "^1.1.0"
+    elliptic "^6.5.4"
+    hash.js "^1.0.0"
+    tslib "^2.0.3"
 
 abi-decoder@^2.4.0:
   version "2.4.0"
