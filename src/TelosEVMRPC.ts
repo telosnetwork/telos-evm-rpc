@@ -65,7 +65,7 @@ export default class TelosEVMRPC {
 
         this.fastify = fastify({
             trustProxy: true,
-            logger
+            logger: this.debug ? logger : false
         })
     }
 
