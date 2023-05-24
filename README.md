@@ -5,6 +5,8 @@ Required plugin config at config.json
 ```json
 {
   "chainId": 41,
+  "pm2Name": "telos-testnet-rpc",
+  "pm2Instances": 4,
   "debug": true,
   "apiHost": "127.0.0.1",
   "apiPort": 3000,
