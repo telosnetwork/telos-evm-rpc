@@ -39,7 +39,7 @@ export default class Subscription {
         return this.id;
     }
 
-    publish(msg: string) {
+    publish(msg: string): void {
         try {
             this.wsServer.publish(this.id, msg);
         } catch (e) {

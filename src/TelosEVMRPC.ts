@@ -2,53 +2,34 @@ import {fastify, FastifyInstance, FastifyListenOptions} from "fastify";
 import fastifyTraps from '@dnlup/fastify-traps'
 import fastifyCors from '@fastify/cors'
 import fetch from "node-fetch";
-import {join} from "path";
-import {Transaction} from '@ethereumjs/tx';
 import Common, {default as ethCommon} from '@ethereumjs/common';
-import Bloom from "./bloom";
-import {blockHexToHash, toChecksumAddress} from "./util/utils"
 import {createLogger} from "./util/logger";
 import evmRoute from './routes/evm'
-import RPCBroadcaster from "./ws/RPCBroadcaster";
 import {RedisClientConnection, TelosEvmConfig} from "./types";
 import WebsocketRPC from "./ws/WebsocketRPC";
-import { Api, JsonRpc, RpcError } from 'eosjs';
+import {JsonRpc} from 'eosjs';
 import {
-    Action,
     APIClient,
     FetchProvider,
     Name,
     PrivateKey,
-    SignedTransaction,
-    Struct,
-    Transaction as AntelopeTransaction,
 } from '@greymass/eosio'
-import {Client, ClientOptions} from "@elastic/elasticsearch";
-import type { RedisClientType } from 'redis'
+import {Client} from "@elastic/elasticsearch";
 import { createClient } from 'redis'
 
 import {RedisClientOptions} from "@redis/client";
 
 const logger = createLogger(`telos-evm-rpc`)
-const BN = require('bn.js');
-const createKeccakHash = require('keccak');
 const {TelosEvmApi} = require('@telosnetwork/telosevm-js');
-
-const KEYWORD_STRING_TRIM_SIZE = 32000;
-const RECEIPT_LOG_START = "RCPT{{";
-const RECEIPT_LOG_END = "}}RCPT";
 
 export default class TelosEVMRPC {
     debug = false;
 
     common: Common;
-    decimalsBN = new BN('1000000000000000000');
     baseChain = 'mainnet';
     hardfork = 'istanbul';
-    counter = 0;
     fastify: FastifyInstance;
     config: TelosEvmConfig;
-    rpcBroadcaster: RPCBroadcaster;
     websocketRPC: WebsocketRPC
 
     constructor(config: TelosEvmConfig) {
@@ -60,7 +41,6 @@ export default class TelosEVMRPC {
                 {chainId: config.chainId},
                 this.hardfork
             );
-            //this.registerStreamHandlers();
         }
 
         this.fastify = fastify({
@@ -68,47 +48,6 @@ export default class TelosEVMRPC {
             logger: this.debug ? logger : false
         })
     }
-
-    /*
-        this.streamHandlers.push({
-            event: 'trace',
-            handler: async streamEvent => {
-                try {
-                    const headers = streamEvent.properties.headers;
-                    if (headers) {
-                        if (headers.event === 'delta' && headers.code === 'eosio' && headers.table === 'global') {
-                            if (streamEvent.content) {
-                                const evPayload = {
-                                    event: 'evm_block',
-                                    globalDelta: streamEvent.content.toString()
-                                };
-                                process.send(evPayload);
-                            }
-                        } else if (headers.event === 'trace' && headers.account === 'eosio.evm' && headers.name === 'raw') {
-                            if (streamEvent.content) {
-                                const evPayload = {
-                                    event: 'evm_transaction',
-                                    actionTrace: streamEvent.content.toString()
-
-                                };
-                                process.send(evPayload);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.log(`Error during stream handler: ${e.message}`)
-                }
-            }
-        });
-    }
-
-    initHandlerMap(): any {
-        return {
-            'evm_transaction': (msg) => this.rpcBroadcaster.broadcastRaw(msg.actionTrace),
-            'evm_block': (msg) => this.rpcBroadcaster.handleGlobalDelta(msg.globalDelta)
-        };
-    }
-     */
 
     async start() {
         await this.fastify.register(fastifyCors)
@@ -201,9 +140,4 @@ export default class TelosEVMRPC {
         return client
     }
 
-    logDebug(msg: String): void {
-        if (this.debug) {
-            console.log(msg);
-        }
-    }
 }

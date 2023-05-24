@@ -2,7 +2,6 @@ import uWS, {TemplatedApp} from "uWebSockets.js";
 import ReconnectingWebSocket from "reconnecting-websocket";
 import WebSocket from "ws";
 import {TelosEvmConfig} from "../types";
-import {keccak256} from "ethereumjs-util";
 import Subscription from "./Subscription";
 import LogSubscription from "./LogSubscription";
 
@@ -27,14 +26,14 @@ export default class WebsocketRPC {
         this.headSubscription = new Subscription(this.websocketRPC, NEW_HEADS_SUBSCRIPTION);
     }
 
-    initWSClient() {
+    initWSClient(): void{
         this.websocketClient = new ReconnectingWebSocket(this.config.indexerWebsocketUri, [], {WebSocket});
         this.websocketClient.addEventListener('message', (data) => {
             this.handleIndexerMessage(data.data);
         })
     }
 
-    initUWS() {
+    initUWS(): void {
         const host = this.config.rpcWebsocketHost;
         const port = this.config.rpcWebsocketPort;
         this.websocketRPC = uWS.App({}).ws('/evm', {
@@ -139,7 +138,7 @@ export default class WebsocketRPC {
         }
     }
 
-    async handleSubscription(ws, msgObj) {
+    async handleSubscription(ws, msgObj): Promise<void> {
         switch (msgObj.params[0]) {
             case 'logs':
                 this.handleLogSubscription(ws, msgObj);
@@ -153,7 +152,7 @@ export default class WebsocketRPC {
         }
     }
 
-    async handleLogSubscription(ws, msgObj) {
+    async handleLogSubscription(ws, msgObj): Promise<void> {
         const filter = msgObj.params[1];
         const subscriptionId = LogSubscription.makeId(filter);
         if (!this.logSubscriptions.has(subscriptionId)) {
@@ -164,12 +163,12 @@ export default class WebsocketRPC {
         ws.send(JSON.stringify(this.makeResponse(subscriptionId, msgObj)));
     }
 
-    async handleNewHeadsSubscription(ws, msgObj) {
+    async handleNewHeadsSubscription(ws, msgObj): Promise<void> {
         this.headSubscription.addWs(ws);
         ws.send(JSON.stringify(this.makeResponse(this.headSubscription.getId(), msgObj)));
     }
 
-    handleIndexerMessage(data) {
+    handleIndexerMessage(data): void{
         const dataObj = JSON.parse(data);
         switch (dataObj.type) {
             case 'raw':
@@ -183,13 +182,13 @@ export default class WebsocketRPC {
         }
     }
 
-    handleRawMessage(data) {
+    handleRawMessage(data): void {
         for (const [subId, sub] of this.logSubscriptions) {
             sub.handleRawAction(data);
         }
     }
 
-    handleHeadMessage(data) {
+    handleHeadMessage(data): void {
         this.headSubscription.publish(data);
     }
 

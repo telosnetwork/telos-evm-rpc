@@ -13,7 +13,6 @@ export interface EthLog {
     transactionIndex: string;
 }
 
-
 export const NULL_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 const KECCAK256_RLP_ARRAY = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
@@ -78,16 +77,6 @@ export function toChecksumAddress(address) {
     return ret
 }
 
-export function getParentBlockHash(blockNumberHex: string) {
-    let blockNumber = parseInt(blockNumberHex, 16);
-    let parentBlockHex = (blockNumber - 1).toString(16);
-    return blockHexToHash(parentBlockHex);
-}
-
-export function blockHexToHash(blockHex: string, zeroXPrefix: boolean = true) {
-    return `${zeroXPrefix ? '0x' : ''}${createKeccakHash('keccak256').update(blockHex.replace(/^0x/, '')).digest('hex')}`;
-}
-
 export function buildLogsObject(logs: any[], blHash: string, blNumber: string, txHash: string, txIndex: string): EthLog[] {
     const _logs: EthLog[] = [];
     if (logs) {
@@ -135,19 +124,16 @@ export function logFilterMatch(log, addressFilter, topicsFilter) {
         let thisAddr = removeZeroHexFromFilter(log.address.toLowerCase(), true);
         addressFilter = removeZeroHexFromFilter(addressFilter, true);
         if (Array.isArray(addressFilter) && !addressFilter.includes(thisAddr)) {
-            // console.log('filter out by addressFilter as array');
             return false;
         }
 
         if (!Array.isArray(addressFilter) && thisAddr != addressFilter) {
-            // console.log('filter out by addressFilter as string');
             return false;
         }
     }
 
     if (topicsFilter) {
         if (!hasTopics(log.topics, topicsFilter)) {
-            // console.log('filter out by topics');
             return false;
         }
     }
@@ -158,11 +144,6 @@ export function logFilterMatch(log, addressFilter, topicsFilter) {
 export function leftPadZerosEvenBytes(value) {
     let removed = value.replace(/^0x/, '');
     return removed.length % 2 === 0 ? `0x${removed}` : `0x0${removed}`
-}
-
-export function leftPadZerosToWidth(value, width) {
-    let removed = value.replace(/^0x/, '');
-    return `0x${removed.padStart(width, '0')}`
 }
 
 export function removeLeftZeros(value, zeroXPrefix=true) {
@@ -193,7 +174,6 @@ export function removeZeroHexFromFilter(filter, trimLeftZeros=false) {
 
 export function hasTopics(topics: string[], topicsFilter: string[]) {
     const topicsFiltered = [];
-    // console.log(`filtering ${JSON.stringify(topics)} by filter: ${JSON.stringify(topicsFilter)}`);
     topics = removeZeroHexFromFilter(topics, true);
     topicsFilter = topicsFilter.map(t => {
         return removeZeroHexFromFilter(t, true);

@@ -1,5 +1,5 @@
 import Subscription from "./Subscription";
-import { TemplatedApp, WebSocket } from "uWebSockets.js";
+import {TemplatedApp} from "uWebSockets.js";
 import {keccak256} from "ethereumjs-util";
 import {logFilterMatch, makeLogObject} from "../util/utils";
 
