@@ -5,5 +5,5 @@ OG_DIR=`pwd`
 
 cd $INSTALL_ROOT
 npx tsc
-pm2 start ./ecosystem.config.js
+pm2 start ./ecosystem.config.js --update-env --silent
 cd $OG_DIR

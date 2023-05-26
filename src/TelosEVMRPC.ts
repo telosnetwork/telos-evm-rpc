@@ -66,7 +66,12 @@ export default class TelosEVMRPC {
         }
 
         this.fastify.listen(opts, err => {
-            if (err) throw err
+            logger.info(`Starting teloscan-evm-rpc at ${opts.host}:${opts.port}`)
+
+            if (err) {
+                logger.error(`ERROR running teloscan-evm-rpc: ${JSON.stringify(err.message)}`)
+                throw err
+            }
         })
     }
 
