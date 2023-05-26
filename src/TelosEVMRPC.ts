@@ -18,6 +18,7 @@ import {Client} from "@elastic/elasticsearch";
 import { createClient } from 'redis'
 
 import {RedisClientOptions} from "@redis/client";
+import {ClientOptions} from "@elastic/elasticsearch/lib/client";
 
 const logger = createLogger(`telos-evm-rpc`)
 const {TelosEvmApi} = require('@telosnetwork/telosevm-js');
@@ -96,13 +97,21 @@ export default class TelosEVMRPC {
     }
 
     createElasticsearchClient(): Client {
-        return new Client({
+        const clientOpts: ClientOptions = {
             node: this.config.elasticNode,
-            auth: {
+        }
+
+        const user = this.config.elasticUser;
+        const pass = this.config.elasticPass;
+
+        if (user && pass) {
+            clientOpts.auth = {
                 username: this.config.elasticUser,
                 password: this.config.elasticPass
             }
-        });
+        }
+
+        return new Client(clientOpts);
     }
 
     async createRedisClient(): Promise<RedisClientConnection> {
