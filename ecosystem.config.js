@@ -6,5 +6,10 @@ module.exports = {
     exec_mode: "cluster",
     instances: config.pm2Instances,
     script: 'dist/main.js',
+    merge_logs: true,
+    autorestart: true,
+    exp_backoff_restart_delay: 100,
+    watch: false,
+    time: true,
   }],
 };
