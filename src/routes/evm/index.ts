@@ -1182,7 +1182,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			nonce: removeLeftZeros(numToHex(receipt['nonce'])),
 			to: toChecksumAddress(receipt['to']),
 			transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
-			value: removeLeftZeros(numToHex(receipt['value'])),
+			value: removeLeftZeros(receipt['value']),
 			v: removeLeftZeros(v),
 			r, s
 		};
