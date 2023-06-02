@@ -294,22 +294,33 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function searchActionByHash(trxHash: string): Promise<any> {
 		Logger.log(`searching action by hash: ${trxHash}`)
+
 		try {
 			let _hash = trxHash.toLowerCase();
-			if (_hash.startsWith("0x")) {
-				_hash = _hash.slice(2);
+			if (!_hash.startsWith("0x")) {
+				_hash = `0x${_hash}`;
+			}
+			const cachedData = await fastify.redis.get(_hash);
+			if (cachedData) {
+				return JSON.parse(cachedData);
 			}
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
 				size: 1,
 				query: {
 					bool: {
-						must: [{ term: { "@raw.hash": "0x" + _hash } }]
+						must: [{ term: { "@raw.hash": _hash } }]
 					}
 				}
 			});
 			//Logger.log(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
-			return results?.hits?.hits[0]?._source;
+			const doc = results?.hits?.hits[0]?._source;
+			if (doc) {
+				await fastify.redis.set(_hash, JSON.stringify(doc), {
+					PX: 5000
+				})
+			}
+			return doc;
 		} catch (e) {
 			console.log(e);
 			return null;
@@ -1198,6 +1209,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return emptyBlockFromDelta(blockDelta);
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
+		for (const receiptDoc of receipts) {
+			const key = receiptDoc._source['@raw'].hash;
+			await fastify.redis.set(key, JSON.stringify(receiptDoc._source), {
+				PX: 5000
+			})
+		}
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full) : await emptyBlockFromNumber(blockNumber);
 	});
 
