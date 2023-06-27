@@ -15,6 +15,9 @@ export default class LogSubscription extends Subscription {
     }
 
     handleRawAction(rawAction: any): void {
+
+        console.log("In handleRawAction, rawAction is " + (typeof rawAction));
+        console.dir(rawAction);
         if (this.debug)
             console.log(`Subscription ${this.id} got rawAction: ${JSON.stringify(rawAction, null, 4)}`)
 
