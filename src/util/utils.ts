@@ -141,6 +141,22 @@ export function logFilterMatch(log, addressFilter, topicsFilter) {
     return true;
 }
 
+export function addHexPrefix(str: string): string {
+    if (typeof str !== 'string') {
+        return str
+    }
+
+    return isHexPrefixed(str) ? str : '0x' + str
+}
+
+export function isHexPrefixed(str: string): boolean {
+    if (typeof str !== 'string') {
+        throw new Error(`[isHexPrefixed] input must be type 'string', received type ${typeof str}`)
+    }
+
+    return str[0] === '0' && str[1] === 'x'
+}
+
 export function leftPadZerosEvenBytes(value) {
     let removed = value.replace(/^0x/, '');
     return removed.length % 2 === 0 ? `0x${removed}` : `0x0${removed}`
