@@ -285,9 +285,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getVRS(receiptDoc): Promise<any> {
 		let receipt = receiptDoc["@raw"];
-		const v = addHexPrefix(typeof receipt.v === 'string' ? receipt.v : receipt.v.toString(16));
-		const r = addHexPrefix(receipt.r);
-		const s = addHexPrefix(receipt.s);
+		const v = removeLeftZeros(typeof receipt.v === 'string' ? receipt.v : receipt.v.toString(16), true);
+		const r = removeLeftZeros(receipt.r, true);
+		const s = removeLeftZeros(receipt.s, true);
 
 		return {v,r,s};
 	}
