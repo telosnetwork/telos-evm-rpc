@@ -591,10 +591,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let trace: any = {
 			action: {
 				callType: 'call',
-				from: toChecksumAddress(receipt['from']),
+				from: toChecksumAddress(receipt['from']).toLowerCase(),
 				gas: gas,
 				input: receipt.input_data,
-				to: toChecksumAddress(receipt['to']),
+				to: toChecksumAddress(receipt['to']).toLowerCase(),
 				value: removeLeftZeros(receipt.value)
 			},
 			result: {
@@ -626,11 +626,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let trace: any = {
 			action: {
 				callType: toOpname(itx.callType),
-				//why is 0x not in the receipt table?
-				from: toChecksumAddress(itx.from),
+				// why is 0x not in the receipt table?
+				// use toChecksum to add it if not present and then lowercase it
+				from: toChecksumAddress(itx.from).toLowerCase(),
 				gas: addHexPrefix(itx.gas),
 				input: addHexPrefix(itx.input),
-				to: toChecksumAddress(itx.to),
+				to: toChecksumAddress(itx.to).toLowerCase(),
 				value: removeLeftZeros(itx.value)
 			},
 			result: {
@@ -836,19 +837,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				handleGasEstimationError(gas);
 			}
 
-			/*  from contract:
-                if (estimate_gas) {
-                    if (result.er != ExitReason::returned) {
-                        eosio::print("0x" + bin2hex(result.output));
-                    } else {
-                        eosio::print("0x" + intx::hex(gas_used));
-                    }
-                    eosio::check(false, "");
-                }
-
-                if gas == '0x', the transaction reverted without any output
-            */
-			if (gas == '0x') {
+			if (gas === '0x') {
 				let err = new TransactionError('Transaction reverted');
 				err.errorMessage = `execution reverted: no output`;
 				err.data = gas;
@@ -860,6 +849,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			//let toReturn = `0x${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			return removeLeftZeros(toReturn);
 		} catch (e) {
+			console.log(e);
 			handleGasEstimationError(e.receipt.output);
 		}
 	});
@@ -1254,8 +1244,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns an array of all logs matching a given filter object.
 	 */
 	methods.set('eth_getLogs', async ([parameters]) => {
-		// console.log(parameters);
 		let params = await parameters; // Since we are using async/await, the parameters are actually a Promise
+		console.log(params);
 
 		const queryBody: any = {
 			bool: {
@@ -1331,36 +1321,40 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (addressFilter.startsWith('0x')) {
 					addressFilter = addressFilter.slice(2);
 				}
-				// console.log(`getLogs using address: ${address}`);
+				console.log(`getLogs using address: ${addressFilter}`);
 				queryBody.bool.must.push({term: {"@raw.logs.address": addressFilter}})
 			}
 		}
 
 		if (topicsFilter && topicsFilter.length > 0) {
 			let flatTopics = [];
-			// console.log(`getLogs using topics:\n${topics}`);
-			topicsFilter.forEach(topic => {
+			console.log(`getLogs using raw topics:\n${topicsFilter}`);
+			topicsFilter.forEach((topic, index) => {
 				if (!topic)
 					return;
 
-				let trimmed = removeZeroHexFromFilter(topic, true);
+				console.log(`topic: ${topic}`);
+				let trimmed = removeZeroHexFromFilter(topic, false);
+				console.log(`topic trimmed: ${trimmed}`);
 
 				if (Array.isArray(trimmed)) {
+					// Todo: make or query by index
 					trimmed.forEach(t => flatTopics.push(t));
 				} else {
 					flatTopics.push(trimmed);
 				}
 			})
+			console.log(`getLogs using topics:\n${topicsFilter}`);
 			queryBody.bool.must.push({
 				terms: {
-					"@raw.logs.topics": flatTopics
+					"@raw.logs.topics": flatTopics,
 				}
 			})
 		}
 
 		// search
 		try {
-			// Logger.log(`About to run logs query with queryBody: ${JSON.stringify(queryBody)}`)
+			console.log(`About to run logs query with queryBody: ${JSON.stringify(queryBody)}`)
 			const searchResults = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
 				size: 2000,
@@ -1368,7 +1362,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				sort: [{ "global_sequence": { order: "asc" } }]
 			});
 
-			// Logger.log(`Logs query result: ${JSON.stringify(searchResults)}`)
+			console.log(`Logs query result: ${JSON.stringify(searchResults)}`)
 			// processing
 			const results = [];
 			for (const hit of searchResults.hits.hits) {

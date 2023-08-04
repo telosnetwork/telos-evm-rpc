@@ -164,28 +164,36 @@ export function removeZeroHexFromFilter(filter, trimLeftZeros=false) {
                 return f;
 
             let noPrefix = f.replace(/^0x/, '').toLowerCase();
-            return trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+            let val =  trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+            console.log(val);
+            return val;
         })
     }
 
     let noPrefix = filter.replace(/^0x/, '').toLowerCase();
-    return trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+    let val = trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+    console.log(val);
+    return val;
 }
 
 export function hasTopics(topics: string[], topicsFilter: string[]) {
     const topicsFiltered = [];
+    console.log('topics:' + JSON.stringify(topics));
+    console.log('topicsFilter:' + JSON.stringify(topicsFilter));
     topics = removeZeroHexFromFilter(topics, true);
     topicsFilter = topicsFilter.map(t => {
         return removeZeroHexFromFilter(t, true);
     })
-
-    for (const [index,filterTopic] of topicsFilter.entries()) {
+    console.log('topics:' + JSON.stringify(topics));
+    console.log('topicsFilter:' + JSON.stringify(topicsFilter));
+    for (const [index, filterTopic] of topicsFilter.entries()) {
         const topic = topics[index];
+        const isFilterArray = Array.isArray(filterTopic);
         if (filterTopic === null) {
             topicsFiltered.push(true);
         } else if (topic === filterTopic) {
             topicsFiltered.push(true);
-        } else if (topic !== '' && filterTopic.includes(topic)) {
+        } else if (isFilterArray && filterTopic.includes(topic)) {
             topicsFiltered.push(true);
         } else {
             topicsFiltered.push(false);
