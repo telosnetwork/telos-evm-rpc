@@ -15,7 +15,7 @@ import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
 import moment from "moment";
 import {Api} from 'eosjs';
-import {ethers} from 'ethers';
+import {ethers, BigNumber} from 'ethers';
 import {JsSignatureProvider} from 'eosjs/dist/eosjs-jssig'
 import {TransactionVars} from '@telosnetwork/telosevm-js'
 import { addHexPrefix } from '@ethereumjs/util';
@@ -605,7 +605,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			traceAddress: [],
 			type: 'call'
 		}
-
+		console.log(receipt);
+		console.log(receipt.itxs[0].traceAddress);
+		console.log(adHoc);
+		// Todo: hope traceAddress matches the right trace and move that to makeTrace
 		if (receipt?.errors?.length > 0)
 			trace.error = receipt.errors[0];
 
@@ -638,7 +641,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				gasUsed: addHexPrefix(itx.gasUsed),
 				output: addHexPrefix(itx.output),
 			},
-			subtraces: itx.subtraces,
+			subtraces: parseInt(itx.subtraces),
 			traceAddress: itx.traceAddress,
 			type: itx.type
 		}
@@ -807,8 +810,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_estimateGas', async ([txParams, block]) => {
 		if (txParams.hasOwnProperty('value')) {
-			const intValue = parseInt(txParams.value, 16);
-			txParams.value = isNaN(intValue) ? 0 : intValue;
+			txParams.value = BigNumber.from(txParams.value).toHexString().slice(2);
 		}
 
 		const account = await fastify.evm.telos.getEthAccount(txParams.from.toLowerCase());
