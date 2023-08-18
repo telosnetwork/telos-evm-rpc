@@ -399,27 +399,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			});
-			//Logger.log(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
 			let blockDelta = results?.hits?.hits[0]?._source;
 			if (!blockDelta) {
 				return null;
 			}
 
-			const timestamp = new Date(blockDelta['@timestamp'] + 'Z').getTime() / 1000;
-			const blockNumberHex = addHexPrefix(blockDelta["@global"].block_num.toString(16));
-            const extraData = addHexPrefix(blockDelta['@blockHash']);
-            const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
-
-			return Object.assign({}, BLOCK_TEMPLATE, {
-				gasUsed: "0x0",
-				parentHash: parentHash,
-				hash: blockHash,
-				logsBloom: addHexPrefix(new Bloom().bitvector.toString("hex")),
-				number: removeLeftZeros(blockNumberHex),
-				timestamp: removeLeftZeros(timestamp?.toString(16)),
-				transactions: [],
-                extraData: extraData
-			});
+			return await emptyBlockFromDelta(blockDelta);
 		} catch (e) {
 			console.log(e);
 			return null;
