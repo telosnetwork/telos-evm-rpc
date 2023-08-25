@@ -24,7 +24,7 @@ const EMPTY_LOGS = '0x0000000000000000000000000000000000000000000000000000000000
 const BLOCK_GAS_LIMIT = '0x0'
 
 export const GENESIS_BLOCKS = {
-    "0x40": {
+    "0x28": {
         "difficulty": "0x0",
         "extraData": "0x00000024796a9998ec49fb788de51614c57276dc6151bd2328305dba5d018897",
         "gasLimit": "0x0",
@@ -46,7 +46,7 @@ export const GENESIS_BLOCKS = {
         "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
         "uncles": []
     },
-    "0x41": {
+    "0x29": {
         "difficulty": "0x0",
         "extraData": "0x000000397128c497668c241b27d1521c764156cea50bcac87892fc8916e23b24",
         "gasLimit": "0x0",
