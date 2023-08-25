@@ -9,6 +9,7 @@ import {
 	logFilterMatch,
 	makeLogObject,
 	BLOCK_TEMPLATE,
+	GENESIS_BLOCKS,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
@@ -38,7 +39,6 @@ const REVERT_FUNCTION_SELECTOR = '0x08c379a0'
 const REVERT_PANIC_SELECTOR = '0x4e487b71'
 
 const EOSIO_ASSERTION_PREFIX = 'assertion failure with message: '
-
 
 @Struct.type('call')
 export class Call extends Struct {
@@ -206,6 +206,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	const chainIds = [1, 3, 4, 42];
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
+
+	const CHAIN_ID = opts.chainId.toString();
+	const CHAIN_ID_HEX = addHexPrefix(opts.chainId.toString(16));
+	const GENESIS_BLOCK = GENESIS_BLOCKS[CHAIN_ID_HEX];
+	const GENESIS_BLOCK_HASH = GENESIS_BLOCK.hash;
+
 	let Logger = new DebugLogger(opts.debug);
 
 
@@ -736,13 +742,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns the current network id.
 	 */
-	methods.set('net_version', () => opts.chainId.toString());
+	methods.set('net_version', () => CHAIN_ID);
 
 	/**
 	 * Returns the currently configured chain id, a value used in
 	 * replay-protected transaction signing as introduced by EIP-155.
 	 */
-	methods.set('eth_chainId', () => addHexPrefix(opts.chainId.toString(16)));
+	methods.set('eth_chainId', () => CHAIN_ID_HEX);
 
 	/**
 	 * Returns a list of addresses owned by client.
@@ -1178,6 +1184,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBlockByNumber', async ([block, full]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
+		if (blockNumber === 0)
+			return GENESIS_BLOCK;
+
 		const blockDelta = await getDeltaDocFromNumber(blockNumber);
 		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
 			return emptyBlockFromDelta(blockDelta);
@@ -1191,6 +1200,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBlockByHash', async ([hash, full]) => {
 		let _hash = hash.toLowerCase();
+		if (_hash === GENESIS_BLOCK_HASH)
+			return GENESIS_BLOCK;
+
 		if (_hash.startsWith("0x")) {
 			_hash = _hash.slice(2);
 		}
