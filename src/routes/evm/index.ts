@@ -778,7 +778,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_getCode', async ([address]) => {
 		try {
 			const account = await fastify.evm.telos.getEthAccount(address.toLowerCase());
-			if (account.code && account.code.length > 0) {
+			console.log(account);
+			if (account.code && account.code.length > 0 && account.code !== "0x") {
 				return addHexPrefix(Buffer.from(account.code).toString("hex"));
 			} else {
 				return "0x";
@@ -843,6 +844,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return removeLeftZeros(toReturn);
 		} catch (e) {
 			console.log(e);
+			console.log(e.receipt.itxs);
 			handleGasEstimationError(e.receipt.output);
 		}
 	});
@@ -986,11 +988,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const revertLength = REVERT.length;
 				const startResult = message.length - result.length;
 				const beforeResult = message.substring((startResult - revertLength), startResult);
-				if (beforeResult == REVERT) {
+				if (beforeResult === REVERT) {
 					let output = "0x" + (result.replace(/^0x/, ''));
 					let err = new TransactionError('Transaction reverted');
 					err.data = output;
-
 					if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 						err.errorMessage = `execution reverted: ${parseRevertReason(output)}`;
 					} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
@@ -1244,7 +1245,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getLogs', async ([parameters]) => {
 		let params = await parameters; // Since we are using async/await, the parameters are actually a Promise
-		console.log(params);
+		//console.log(params);
 
 		const queryBody: any = {
 			bool: {
@@ -1320,21 +1321,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (addressFilter.startsWith('0x')) {
 					addressFilter = addressFilter.slice(2);
 				}
-				console.log(`getLogs using address: ${addressFilter}`);
+				//console.log(`getLogs using address: ${addressFilter}`);
 				queryBody.bool.must.push({term: {"@raw.logs.address": addressFilter}})
 			}
 		}
 
 		if (topicsFilter && topicsFilter.length > 0) {
 			let flatTopics = [];
-			console.log(`getLogs using raw topics:\n${topicsFilter}`);
+			//console.log(`getLogs using raw topics:\n${topicsFilter}`);
 			topicsFilter.forEach((topic, index) => {
 				if (!topic)
 					return;
 
-				console.log(`topic: ${topic}`);
+				//console.log(`topic: ${topic}`);
 				let trimmed = removeZeroHexFromFilter(topic, false);
-				console.log(`topic trimmed: ${trimmed}`);
+				//console.log(`topic trimmed: ${trimmed}`);
 
 				if (Array.isArray(trimmed)) {
 					// Todo: make or query by index
@@ -1343,7 +1344,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					flatTopics.push(trimmed);
 				}
 			})
-			console.log(`getLogs using topics:\n${topicsFilter}`);
+			//console.log(`getLogs using topics:\n${topicsFilter}`);
 			queryBody.bool.must.push({
 				terms: {
 					"@raw.logs.topics": flatTopics,
