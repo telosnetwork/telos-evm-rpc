@@ -25,7 +25,9 @@ export interface TelosEvmConfig {
     elasticUser: string;
     elasticPass: string;
     elasticIndexPrefix: string;
-    elasticIndexVersion: string
+    elasticIndexVersion: string;
+    orderNonces: boolean;
+    orderNonceRetryTimeout: number;
 }
 
 /** A conventional Redis connection. */

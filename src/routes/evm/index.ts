@@ -28,6 +28,7 @@ import {
 	Struct,
 	Transaction, Bytes, Checksum160
 } from '@wharfkit/antelope'
+import NonceRetryManager from "../../util/NonceRetryManager";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -214,8 +215,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	let Logger = new DebugLogger(opts.debug);
 
+	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm.telos, fastify, makeTrxVars);
+	nonceRetryManager.start();
 
-    // Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
+	// Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
     // TODO: Maybe cache the ABI here if eosjs doesn't already
     //   similar to https://raw.githubusercontent.com/JakubDziworski/Eos-Offline-Transaction-Example/master/src/tx-builder.ts
     const privateKeys = [opts.signer_key]
@@ -1017,9 +1020,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				account: opts.signer_account,
 				tx: signedTx,
 				ram_payer: fastify.evm.telos.telosContract,
-			}, fastify.cachingApi, await makeTrxVars());
+				api: fastify.cachingApi,
+				trxVars: await makeTrxVars()
+			});
 
 			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
+
+			if (opts.orderNonces) {
+				if (consoleOutput.includes('incorrect nonce')) {
+					return nonceRetryManager.submitFailedRawTrx(signedTx);
+				}
+			}
 
 			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
 			let receipt = JSON.parse(receiptLog);
