@@ -548,7 +548,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			const key = `last_onchain_block`;
+			const key = `last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData)
