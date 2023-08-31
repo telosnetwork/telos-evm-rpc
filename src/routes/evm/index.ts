@@ -284,7 +284,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             .toString()
 
         const getInfoResponse = await getInfo()
-        //const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
+		const header = getInfoResponse.getTransactionHeader(45);
+		return {
+			expiration: header.expiration.toString(),
+			ref_block_num: header.ref_block_num.toNumber(),
+			ref_block_prefix: header.ref_block_prefix.toNumber()
+		}
+
+		/*
+        const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
 		const prefix = parseInt(reverseHex(getInfoResponse.last_irreversible_block_id.toString().substring(16, 24)), 16);
 
 		return {
@@ -292,6 +300,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             ref_block_num: getInfoResponse.last_irreversible_block_num.toNumber() & 0xffff,
             ref_block_prefix: prefix,
         }
+		 */
     }
 
 	async function getVRS(receiptDoc): Promise<any> {
