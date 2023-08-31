@@ -228,14 +228,12 @@ export function removeZeroHexFromFilter(filter, trimLeftZeros=false) {
 
             let noPrefix = f.replace(/^0x/, '').toLowerCase();
             let val =  trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
-            console.log(val);
             return val;
         })
     }
 
     let noPrefix = filter.replace(/^0x/, '').toLowerCase();
     let val = trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
-    console.log(val);
     return val;
 }
 

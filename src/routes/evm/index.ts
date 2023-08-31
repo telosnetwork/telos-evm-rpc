@@ -596,9 +596,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			traceAddress: [],
 			type: 'call'
 		}
-		console.log(receipt);
-		console.log(receipt.itxs[0].traceAddress);
-		console.log(adHoc);
 		// Todo: hope traceAddress matches the right trace and move that to makeTrace
 		if (receipt?.errors?.length > 0)
 			trace.error = receipt.errors[0];
@@ -778,7 +775,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_getCode', async ([address]) => {
 		try {
 			const account = await fastify.evm.telos.getEthAccount(address.toLowerCase());
-			console.log(account);
 			if (account.code && account.code.length > 0 && account.code !== "0x") {
 				return addHexPrefix(Buffer.from(account.code).toString("hex"));
 			} else {
