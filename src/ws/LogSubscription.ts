@@ -19,17 +19,19 @@ export default class LogSubscription extends Subscription {
             console.log(`Subscription ${this.id} got rawAction: ${JSON.stringify(rawAction, null, 4)}`)
 
         const logs = rawAction["@raw"].logs || [];
-        let logCount = 0;
-        this.filterMatches(logs).forEach(log => {
-            log.logIndex = logCount++;
+        const matchingLogs = this.filterMatches(logs);
+        for (let i = 0; i < matchingLogs.length; i++) {
+            const log = matchingLogs[i];
             this.publish(JSON.stringify(this.makeLogSubscription(rawAction, log)));
-        });
+        }
     }
 
     filterMatches(logs): Array<any> {
         const addrFilter = this.filter.address;
         const topicFilter = this.filter.topics;
+        let logCount = 0;
         return logs.filter(log => {
+            log.logIndex = logCount++;
             return logFilterMatch(log, addrFilter, topicFilter);
         });
     }
