@@ -10,7 +10,7 @@ import {
 	makeLogObject,
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, reverseHex
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -284,11 +284,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             .toString()
 
         const getInfoResponse = await getInfo()
-        const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
-        return {
+        //const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
+		const prefix = parseInt(reverseHex(getInfoResponse.last_irreversible_block_id.toString().substring(16, 24)), 16);
+
+		return {
             expiration,
-            ref_block_num: getBlockResponse.block_num & 0xffff,
-            ref_block_prefix: getBlockResponse.ref_block_prefix,
+            ref_block_num: getInfoResponse.last_irreversible_block_num.toNumber() & 0xffff,
+            ref_block_prefix: prefix,
         }
     }
 
