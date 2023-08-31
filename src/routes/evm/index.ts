@@ -287,7 +287,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
         return {
             expiration,
-            ref_block_num: getBlockResponse.block_num,
+            ref_block_num: getBlockResponse.block_num & 0xffff,
             ref_block_prefix: getBlockResponse.ref_block_prefix,
         }
     }
