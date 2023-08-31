@@ -13,8 +13,6 @@ interface FailedTrx {
 
 const SLEEP_DURATION = 200;
 const RETRY_INTERVAL = 200;
-const RETRY_TIMEOUT = 2000;
-
 
 export default class NonceRetryManager {
     private telosEvmJs: TelosEvmApi;
@@ -22,9 +20,11 @@ export default class NonceRetryManager {
     private fastify: FastifyInstance;
     private makeTrxVars: Function;
     private queuedSenders: Map<string, FailedTrxList>;
+    private retryTimeout: number;
     constructor(opts: TelosEvmConfig, telosJs: TelosEvmApi, fastify: FastifyInstance, makeTrxVars: Function) {
         this.telosEvmJs = telosJs;
         this.opts = opts;
+        this.retryTimeout = opts.orderNonceRetryTimeout || 2000;
         this.fastify = fastify;
         this.makeTrxVars = makeTrxVars;
         this.queuedSenders = new Map();
@@ -69,7 +69,7 @@ export default class NonceRetryManager {
                 const failedTrx = failedTrxList.getLowestNonce();
 
                 // if we hit the timeout, we should stop retrying this transaction and move onto the next sender for now
-                if ((Date.now() - failedTrx.firstFailed) > RETRY_TIMEOUT) {
+                if ((Date.now() - failedTrx.firstFailed) > this.retryTimeout) {
                     failedTrxList.removeFailedTrx(failedTrx.nonce);
                     continue;
                 }
