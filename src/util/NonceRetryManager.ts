@@ -26,7 +26,7 @@ export default class NonceRetryManager {
     constructor(opts: TelosEvmConfig, telosJs: TelosEvmApi, fastify: FastifyInstance, makeTrxVars: Function) {
         this.telosEvmJs = telosJs;
         this.opts = opts;
-        this.retryTimeout = opts.orderNonceRetryTimeout || 2000;
+        this.retryTimeout = opts.orderNonceRetryTimeout || 60000;
         this.fastify = fastify;
         this.makeTrxVars = makeTrxVars;
         this.queuedSenders = new Map();
