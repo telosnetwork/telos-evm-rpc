@@ -3,6 +3,7 @@ import {TelosEvmApi} from "@telosnetwork/telosevm-js";
 import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
 import {addHexPrefix} from "@ethereumjs/util";
+import * as ws from "ws";
 
 interface FailedTrx {
     sender: string;
@@ -70,7 +71,7 @@ export default class NonceRetryManager {
                     }
 
                     // Get the lowest nonce and maybe retry it
-                    const failedTrx = failedTrxList.getLowestNonce();
+                    let failedTrx = failedTrxList.getLowestNonce();
 
                     // if we hit the timeout, we should stop retrying this transaction and move onto the next sender for now
                     if ((Date.now() - failedTrx.firstFailed) > this.retryTimeout) {
@@ -80,9 +81,15 @@ export default class NonceRetryManager {
 
                     // If we're past the retry duration, let's retry it again
                     if ((Date.now() - failedTrx.lastRetry) > RETRY_INTERVAL) {
-                        const success = await this.sendRawTrx(failedTrx.rawTx);
-                        if (success)
+                        let noNonceFailure = await this.sendRawTrx(failedTrx);
+                        while (noNonceFailure) {
                             failedTrxList.removeFailedTrx(failedTrx.nonce);
+                            if (failedTrxList.size() === 0)
+                                break;
+
+                            failedTrx = failedTrxList.getLowestNonce();
+                            noNonceFailure = await this.sendRawTrx(failedTrx);
+                        }
                     }
                 } catch (e) {
                     console.log(`Error in nonce retry loop: ${e.message}`);
@@ -97,11 +104,12 @@ export default class NonceRetryManager {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private async sendRawTrx(signedTx: string): Promise<boolean> {
+    private async sendRawTrx(failedTx: FailedTrx): Promise<boolean> {
         try {
+            failedTx.lastRetry = Date.now();
             const rawResponse = await this.telosEvmJs.telos.raw({
                 account: this.opts.signer_account,
-                tx: signedTx,
+                tx: failedTx.rawTx,
                 ram_payer: this.telosEvmJs.telos.telosContract,
                 api: this.fastify.cachingApi,
                 trxVars: await this.makeTrxVars()
