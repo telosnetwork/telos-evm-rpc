@@ -63,25 +63,30 @@ export default class NonceRetryManager {
     private async pollPendingTransactions() {
         while (true) {
             for (let [sender, failedTrxList] of this.queuedSenders) {
-                if (failedTrxList.size() === 0) {
-                    this.queuedSenders.delete(sender);
-                    continue;
-                }
+                try {
+                    if (failedTrxList.size() === 0) {
+                        this.queuedSenders.delete(sender);
+                        continue;
+                    }
 
-                // Get the lowest nonce and maybe retry it
-                const failedTrx = failedTrxList.getLowestNonce();
+                    // Get the lowest nonce and maybe retry it
+                    const failedTrx = failedTrxList.getLowestNonce();
 
-                // if we hit the timeout, we should stop retrying this transaction and move onto the next sender for now
-                if ((Date.now() - failedTrx.firstFailed) > this.retryTimeout) {
-                    failedTrxList.removeFailedTrx(failedTrx.nonce);
-                    continue;
-                }
-
-                // If we're past the retry duration, let's retry it again
-                if ((Date.now() - failedTrx.lastRetry) > RETRY_INTERVAL) {
-                    const success = await this.sendRawTrx(failedTrx.rawTx);
-                    if (success)
+                    // if we hit the timeout, we should stop retrying this transaction and move onto the next sender for now
+                    if ((Date.now() - failedTrx.firstFailed) > this.retryTimeout) {
                         failedTrxList.removeFailedTrx(failedTrx.nonce);
+                        continue;
+                    }
+
+                    // If we're past the retry duration, let's retry it again
+                    if ((Date.now() - failedTrx.lastRetry) > RETRY_INTERVAL) {
+                        const success = await this.sendRawTrx(failedTrx.rawTx);
+                        if (success)
+                            failedTrxList.removeFailedTrx(failedTrx.nonce);
+                    }
+                } catch (e) {
+                    console.log(`Error in nonce retry loop: ${e.message}`);
+                    console.error(e);
                 }
             }
             await this.sleep(SLEEP_DURATION);
