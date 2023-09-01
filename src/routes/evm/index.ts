@@ -245,7 +245,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     // AUX FUNCTIONS
 
     async function getInfo(): Promise<API.v1.GetInfoResponse> {
-		const key = `get_info`
+		const key = `${CHAIN_ID_HEX}_get_info`
 		const cachedData = await fastify.redis.get(key)
         if (cachedData) {
 			return API.v1.GetInfoResponse.from(JSON.parse(cachedData));
@@ -261,7 +261,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     }
 
     async function getBlock(numOrId) {
-		const key = `get_block:${numOrId}`
+		const key = `${CHAIN_ID_HEX}_get_block:${numOrId}`
 		const cachedData = await fastify.redis.get(key);
         if (cachedData) {
             return JSON.parse(cachedData);
@@ -542,7 +542,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
-			const key = `last_onchain_block`;
+			const key = `${CHAIN_ID_HEX}_last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData) {
@@ -562,7 +562,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			const key = `last_indexed_block`;
+			const key = `${CHAIN_ID_HEX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData)
@@ -880,7 +880,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
      * Returns the current gas price in wei.
      */
     methods.set('eth_gasPrice', async () => {
-		const key = `gas_price`;
+		const key = `${CHAIN_ID_HEX}_gas_price`;
 		const cachedData = await fastify.redis.get(key);
         if (cachedData) {
             return cachedData;
@@ -1037,12 +1037,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
 
-			if (opts.orderNonces) {
-				if (consoleOutput.includes('incorrect nonce')) {
-					return nonceRetryManager.submitFailedRawTrx(signedTx);
-				}
-			}
-
 			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
 			let receipt = JSON.parse(receiptLog);
 
@@ -1069,6 +1063,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			return addHexPrefix(rawResponse.eth.transactionHash);
 		} catch (e) {
+			if (opts.orderNonces) {
+				const assertionMessage = e?.details[0]?.message
+				if (assertionMessage && assertionMessage.includes('incorrect nonce')) {
+					return nonceRetryManager.submitFailedRawTrx(signedTx);
+				}
+			}
+
 			if (e instanceof TransactionError)
 				throw e;
 
