@@ -2,6 +2,7 @@ import { Transaction } from "@ethereumjs/tx"
 import {TelosEvmApi} from "@telosnetwork/telosevm-js";
 import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
+import {addHexPrefix} from "@ethereumjs/util";
 
 interface FailedTrx {
     sender: string;
@@ -35,6 +36,9 @@ export default class NonceRetryManager {
     }
 
     public submitFailedRawTrx(rawTx: string): string {
+        if (rawTx && rawTx.startsWith('0x'))
+            rawTx = rawTx.substring(2);
+
         let trx = Transaction.fromSerializedTx(Buffer.from(rawTx, 'hex'), {
             common: this.telosEvmJs.chainConfig
         });
@@ -53,7 +57,7 @@ export default class NonceRetryManager {
         else
             this.queuedSenders.set(sender, new FailedTrxList(sender, failedTrx));
 
-        return trx.hash().toString('hex');
+        return addHexPrefix(trx.hash().toString('hex'));
     }
 
     private async pollPendingTransactions() {
