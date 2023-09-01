@@ -62,8 +62,7 @@ export default class NonceRetryManager {
 
     private async pollPendingTransactions() {
         while (true) {
-            for (let sender in this.queuedSenders) {
-                const failedTrxList = this.queuedSenders.get(sender);
+            for (let [sender, failedTrxList] of this.queuedSenders) {
                 if (failedTrxList.size() === 0) {
                     this.queuedSenders.delete(sender);
                     continue;
@@ -94,19 +93,20 @@ export default class NonceRetryManager {
     }
 
     private async sendRawTrx(signedTx: string): Promise<boolean> {
-        const rawResponse = await this.telosEvmJs.telos.raw({
-            account: this.opts.signer_account,
-            tx: signedTx,
-            ram_payer: this.telosEvmJs.telos.telosContract,
-            api: this.fastify.cachingApi,
-            trxVars: await this.makeTrxVars()
-        });
-
-        let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
-
-        return !consoleOutput.includes('incorrect nonce');
+        try {
+            const rawResponse = await this.telosEvmJs.telos.raw({
+                account: this.opts.signer_account,
+                tx: signedTx,
+                ram_payer: this.telosEvmJs.telos.telosContract,
+                api: this.fastify.cachingApi,
+                trxVars: await this.makeTrxVars()
+            });
+            return true;
+        } catch (e) {
+            const assertionMessage = e?.details[0]?.message
+            return !(assertionMessage && assertionMessage.includes('incorrect nonce'));
+        }
     }
-
 }
 
 class FailedTrxList {

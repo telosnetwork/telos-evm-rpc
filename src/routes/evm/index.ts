@@ -215,7 +215,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	let Logger = new DebugLogger(opts.debug);
 
-	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm.telos, fastify, makeTrxVars);
+	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm, fastify, makeTrxVars);
 	nonceRetryManager.start();
 
 	// Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
