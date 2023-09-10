@@ -585,7 +585,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				from: toChecksumAddress(receipt['from']).toLowerCase(),
 				gas: gas,
 				input: receipt.input_data,
-				to: toChecksumAddress(receipt['to']).toLowerCase(),
+				to: receipt['to'] ? toChecksumAddress(receipt['to']).toLowerCase() : null,
 				value: removeLeftZeros(receipt.value)
 			},
 			result: {
@@ -622,7 +622,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				from: toChecksumAddress(itx.from).toLowerCase(),
 				gas: addHexPrefix(itx.gas),
 				input: addHexPrefix(itx.input),
-				to: toChecksumAddress(itx.to).toLowerCase(),
+				to: itx.to ? toChecksumAddress(itx.to).toLowerCase() : null,
 				value: removeLeftZeros(itx.value)
 			},
 			result: {
