@@ -1713,6 +1713,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	fastify.rpcPayloadHandlerContainer.handler = doRpcPayload;
 
+	fastify.get('/evm', { schema }, async (req, reply) => {
+		const block = await methods.get('eth_getBlockByNumber')(['latest', false]);
+		reply.send({
+			name: 'Telos EVM JSON-RPC',
+			message: 'JSON-RPC 2.0 standard only uses HTTP POST, this response is purely informational',
+			chainId: opts.chainId,
+			latestBlock: parseInt(block.number, 16).toString(10),
+			timeBehind: moment(parseInt(block.timestamp, 16) * 1000).fromNow()
+		})
+	})
+
 	fastify.post('/evm', { schema }, async (request: FastifyRequest, reply: FastifyReply) => {
 		let origin;
 		if (request.headers['origin'] === METAMASK_EXTENSION_ORIGIN) {
