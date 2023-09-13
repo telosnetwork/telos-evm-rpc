@@ -10,7 +10,7 @@ import {
 	makeLogObject,
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -585,7 +585,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				from: toChecksumAddress(receipt['from']).toLowerCase(),
 				gas: gas,
 				input: receipt.input_data,
-				to: receipt['to'] ? toChecksumAddress(receipt['to']).toLowerCase() : null,
 				value: removeLeftZeros(receipt.value)
 			},
 			result: {
@@ -596,6 +595,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			traceAddress: [],
 			type: 'call'
 		}
+
+		if (receipt['to'])
+			trace.action.to = toLowerCaseAddress(receipt['to']);
+
 		// Todo: hope traceAddress matches the right trace and move that to makeTrace
 		if (receipt?.errors?.length > 0)
 			trace.error = receipt.errors[0];
@@ -622,7 +625,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				from: toChecksumAddress(itx.from).toLowerCase(),
 				gas: addHexPrefix(itx.gas),
 				input: addHexPrefix(itx.input),
-				to: itx.to ? toChecksumAddress(itx.to).toLowerCase() : null,
 				value: removeLeftZeros(itx.value)
 			},
 			result: {
@@ -633,6 +635,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			traceAddress: itx.traceAddress,
 			type: itx.type
 		}
+
+		if (itx.to)
+			trace.action.to = toLowerCaseAddress(itx.to);
 
 		if (!adHoc) {
 			trace.blockHash = addHexPrefix(receipt['block_hash']);

@@ -102,6 +102,17 @@ export function numToHex(input: number | string) {
     }
 }
 
+export function toLowerCaseAddress(address) {
+    if (!address)
+        return null
+
+    address = address.toLowerCase().replace('0x', '')
+    if (address.length != 40)
+        address = address.padStart(40, "0");
+
+    return `0x${address}`
+}
+
 export function toChecksumAddress(address) {
     if (!address)
         return null
