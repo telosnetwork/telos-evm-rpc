@@ -102,6 +102,17 @@ export function numToHex(input: number | string) {
     }
 }
 
+export function toLowerCaseAddress(address) {
+    if (!address)
+        return null
+
+    address = address.toLowerCase().replace('0x', '')
+    if (address.length != 40)
+        address = address.padStart(40, "0");
+
+    return `0x${address}`
+}
+
 export function toChecksumAddress(address) {
     if (!address)
         return null
@@ -228,27 +239,21 @@ export function removeZeroHexFromFilter(filter, trimLeftZeros=false) {
 
             let noPrefix = f.replace(/^0x/, '').toLowerCase();
             let val =  trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
-            console.log(val);
             return val;
         })
     }
 
     let noPrefix = filter.replace(/^0x/, '').toLowerCase();
     let val = trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
-    console.log(val);
     return val;
 }
 
 export function hasTopics(topics: string[], topicsFilter: string[]) {
     const topicsFiltered = [];
-    console.log('topics:' + JSON.stringify(topics));
-    console.log('topicsFilter:' + JSON.stringify(topicsFilter));
     topics = removeZeroHexFromFilter(topics, true);
     topicsFilter = topicsFilter.map(t => {
         return removeZeroHexFromFilter(t, true);
     })
-    console.log('topics:' + JSON.stringify(topics));
-    console.log('topicsFilter:' + JSON.stringify(topicsFilter));
     for (const [index, filterTopic] of topicsFilter.entries()) {
         const topic = topics[index];
         const isFilterArray = Array.isArray(filterTopic);
