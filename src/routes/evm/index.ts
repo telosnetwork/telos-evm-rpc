@@ -528,7 +528,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
-			const key = `last_onchain_block`;
+			const key = `${CHAIN_ID}-last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData) {
@@ -548,7 +548,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			const key = `last_indexed_block`;
+			const key = `${CHAIN_ID}-last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData)
