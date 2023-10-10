@@ -177,6 +177,10 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
     });
 }
 
+export function reverseHex(hex: string) {
+    return hex.substring(6, 8) + hex.substring(4, 6) + hex.substring(2, 4) + hex.substring(0, 2);
+}
+
 export function logFilterMatch(log, addressFilter, topicsFilter) {
     if (addressFilter) {
         let thisAddr = removeZeroHexFromFilter(log.address.toLowerCase(), true);
