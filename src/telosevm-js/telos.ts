@@ -8,9 +8,7 @@ import * as ethTx from '@ethereumjs/tx'
 const { Transaction } = ethTx
 import Common from '@ethereumjs/common'
 import { ETH_CHAIN, FORK } from './constants'
-import {APIClient, AnyAction, FetchProvider} from "@wharfkit/antelope"
-import {Session, TransactOptions} from "@wharfkit/session";
-const {WalletPluginPrivateKey} = require('@wharfkit/wallet-plugin-privatekey')
+import {APIClient, AnyAction, Checksum256, FetchProvider, PrivateKey, Transaction as AntelopeTransaction, SignedTransaction, Action} from "@wharfkit/antelope"
 
 const BN = require('bn.js')
 
@@ -55,11 +53,13 @@ class GasEstimateError extends Error { }
  */
 export class TelosApi {
   //signatureProvider: any
+  chainId: Checksum256
   signingPermission: string
+  signingKey: PrivateKey
   //rpc: any
   //api: any
-  antelopeSession: Session
-  antelopeApi: APIClient
+  writeAPI: APIClient
+  readAPI: APIClient
   telosContract: string
   chainConfig: any
   debug: boolean
@@ -83,20 +83,16 @@ export class TelosApi {
     evmChainId: any
     antelopeChainId: string
   }) {
-    this.antelopeApi = new APIClient({
+    this.readAPI = new APIClient({
       provider: new FetchProvider(nodeos_read)
     })
     //this.signatureProvider = new JsSignatureProvider(this.telosPrivateKeys)
     this.signingPermission = signingPermission || 'active'
-    this.antelopeSession = new Session({
-      actor: signingAccount,
-      permission: signingPermission,
-      chain: {
-        id: antelopeChainId,
-        url: nodeos_write
-      },
-      walletPlugin: new WalletPluginPrivateKey(telosPrivateKey)
+    this.writeAPI =  new APIClient({
+      provider: new FetchProvider(nodeos_write)
     })
+    this.chainId = Checksum256.from(antelopeChainId)
+    this.signingKey = PrivateKey.from(telosPrivateKey)
     /*
     this.rpc = new JsonRpc(endpoint, { fetch: fetch as any })
     this.api = new Api({
@@ -171,28 +167,38 @@ export class TelosApi {
    */
   async transact(actions: AnyAction[], trxVars?: TransactionVars) {
     try {
-      let trx: any = {
-        actions
-      }
+      let transaction: AntelopeTransaction
 
-      let trxOpts: TransactOptions = {
-        broadcast: true,
-      }
+      // some ABI caching here would prevent excess calls, either that or an abi2core struct
+      const {abi} = await this.readAPI.v1.chain.get_abi(this.telosContract)
 
       if (trxVars) {
-        trx.ref_block_num = trxVars.ref_block_num
-        trx.ref_block_prefix = trxVars.ref_block_prefix
-        trx.expiration = trxVars.expiration
+        transaction = AntelopeTransaction.from({
+            ...trxVars,
+            actions: actions.map((action) => Action.from(action, abi))
+        })
       } else {
-        trxOpts.expireSeconds = 45
+        // This should be changed to use the getInfo from fastity
+        // I didn't want to change how that's exported, so just put in a raw call for it here
+        const getInfoResponse = await this.readAPI.v1.chain.get_info()
+        transaction = AntelopeTransaction.from({
+            ...getInfoResponse.getTransactionHeader(45),
+            actions: actions.map((action) => Action.from(action, abi))
+        })
       }
 
-      const result = await this.antelopeSession.transact(
-        trx, trxOpts
-      )
+      const signature = this.signingKey.signDigest(transaction.signingDigest(this.chainId))
+
+      const signed = SignedTransaction.from({
+        ...transaction,
+        signatures: [signature],
+      })
+
+      const result = await this.writeAPI.v1.chain.send_transaction2(signed)
+
       if (this.debug) {
         try {
-          result.response.processed.action_traces.forEach((trace: any) => {
+          result.processed.action_traces.forEach((trace: any) => {
             console.log(trace.console)
           })
         } catch (e: any) {
@@ -201,7 +207,7 @@ export class TelosApi {
           )
         }
       }
-      return result.response
+      return result
     } catch (e: any) {
       if (this.debug) {
         if (e.json) {
@@ -472,7 +478,7 @@ export class TelosApi {
       show_payer: false // Optional: Show ram payer
     }
     const params = Object.assign({}, defaultParams, data)
-    return await this.antelopeApi.v1.chain.get_table_rows(params)
+    return await this.readAPI.v1.chain.get_table_rows(params)
   }
 
   /**

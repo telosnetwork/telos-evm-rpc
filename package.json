@@ -30,8 +30,6 @@
     "@fastify/cors": "^8.2.1",
     "@types/uws": "^0.13.3",
     "@wharfkit/antelope": "^0.7.0",
-    "@wharfkit/session": "^1.0.0",
-    "@wharfkit/wallet-plugin-privatekey": "^1.0.0",
     "abi-decoder": "^2.4.0",
     "bn.js": "^5.2.0",
     "ethereumjs-abi": "^0.6.8",
