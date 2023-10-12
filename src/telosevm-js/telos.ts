@@ -8,8 +8,8 @@ import * as ethTx from '@ethereumjs/tx'
 const { Transaction } = ethTx
 import Common from '@ethereumjs/common'
 import { ETH_CHAIN, FORK } from './constants'
-import {APIClient, FetchProvider} from "@wharfkit/antelope"
-import {Session} from "@wharfkit/session";
+import {APIClient, AnyAction, FetchProvider} from "@wharfkit/antelope"
+import {Session, TransactOptions} from "@wharfkit/session";
 const {WalletPluginPrivateKey} = require('@wharfkit/wallet-plugin-privatekey')
 
 const BN = require('bn.js')
@@ -169,15 +169,14 @@ export class TelosApi {
    * @param {Api} api An optional Api instance to use for sending the transaction
    * @returns {Promise<any>} EVM receipt and Telos receipt
    */
-  async transact(actions: any[], trxVars?: TransactionVars) {
+  async transact(actions: AnyAction[], trxVars?: TransactionVars) {
     try {
       let trx: any = {
         actions
       }
 
-      let trxOpts: any = {
+      let trxOpts: TransactOptions = {
         broadcast: true,
-        sign: true
       }
 
       if (trxVars) {
@@ -185,8 +184,7 @@ export class TelosApi {
         trx.ref_block_prefix = trxVars.ref_block_prefix
         trx.expiration = trxVars.expiration
       } else {
-        trxOpts.blocksBehind = 3
-        trxOpts.expireSeconds = 3000
+        trxOpts.expireSeconds = 45
       }
 
       const result = await this.antelopeSession.transact(

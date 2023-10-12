@@ -819,7 +819,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				ram_payer: fastify.evm.telos.telosContract,
 				tx: encodedTx,
 				sender: txParams.from,
-			}, fastify.cachingApi, await makeTrxVars());
+				trxVars: await makeTrxVars()
+			}, fastify.cachingApi);
 
 			if (gas.startsWith(REVERT_FUNCTION_SELECTOR) || gas.startsWith(REVERT_PANIC_SELECTOR)) {
 				handleGasEstimationError(gas);
