@@ -1,9 +1,9 @@
 import { Transaction } from "@ethereumjs/tx"
-import {TelosEvmApi} from "@telosnetwork/telosevm-js";
 import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
 import {addHexPrefix} from "@ethereumjs/util";
 import * as ws from "ws";
+import {TelosEvmApi} from "../telosevm-js/telosevm-js";
 
 interface FailedTrx {
     sender: string;
@@ -111,7 +111,6 @@ export default class NonceRetryManager {
                 account: this.opts.signer_account,
                 tx: failedTx.rawTx,
                 ram_payer: this.telosEvmJs.telos.telosContract,
-                api: this.fastify.cachingApi,
                 trxVars: await this.makeTrxVars()
             });
             return true;
