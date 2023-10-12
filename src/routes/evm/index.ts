@@ -13,12 +13,11 @@ import {
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, reverseHex
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
-import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
+//import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
 import moment from "moment";
-import {Api} from 'eosjs';
+//import {Api} from 'eosjs';
 import {ethers, BigNumber} from 'ethers';
-import {JsSignatureProvider} from 'eosjs/dist/eosjs-jssig'
-import {TransactionVars} from '@telosnetwork/telosevm-js'
+//import {JsSignatureProvider} from 'eosjs/dist/eosjs-jssig'
 import { addHexPrefix } from '@ethereumjs/util';
 import {
 	API,
@@ -29,6 +28,7 @@ import {
 	Transaction, Bytes, Checksum160
 } from '@wharfkit/antelope'
 import NonceRetryManager from "../../util/NonceRetryManager";
+import {TransactionVars} from "../../telosevm-js/telos";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -184,13 +184,10 @@ function jsonRPC2Error(reply: FastifyReply, type: string, requestId: string, mes
 	return errorResponse;
 }
 
-interface TransactionError extends Error {
-    errorMessage: string;
-    data: any;
-    code: number;
-}
-
 class TransactionError extends Error {
+	public errorMessage: string
+	public data: any
+	public code: number
 }
 
 export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
@@ -198,13 +195,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	const methods: Map<string, (params?: any) => Promise<any> | any> = new Map();
 	const decimalsBN = new BN('1000000000000000000');
 	const zeros = "0x0000000000000000000000000000000000000000";
-	const chainAddr = [
-		"0xb1f8e55c7f64d203c1400b9d8555d050f94adf39",
-		"0x9f510b19f1ad66f0dcf6e45559fab0d6752c1db7",
-		"0xb8e671734ce5c8d7dfbbea5574fa4cf39f7a54a4",
-		"0xb1d3fbb2f83aecd196f474c16ca5d9cffa0d0ffc",
-	];
-	const chainIds = [1, 3, 4, 42];
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
 
@@ -223,6 +213,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     //   similar to https://raw.githubusercontent.com/JakubDziworski/Eos-Offline-Transaction-Example/master/src/tx-builder.ts
     const privateKeys = [opts.signer_key]
     const accountPublicKey = PrivateKey.from(opts.signer_key).toPublic().toString()
+	/*
     const signatureProvider = new JsSignatureProvider(privateKeys)
     const authorityProvider: AuthorityProvider = {
         getRequiredKeys: (args: AuthorityProviderArgs): Promise<string[]> => {
@@ -230,8 +221,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         },
     }
 
+	 */
+
     const getInfoResponse = await getInfo()
 
+	/*
     fastify.decorate('cachingApi', new Api({
         rpc: fastify.eosjsRpc,
         // abiProvider,
@@ -241,6 +235,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         textDecoder: new TextDecoder(),
         textEncoder: new TextEncoder(),
     }))
+	 */
 
     // AUX FUNCTIONS
 
@@ -256,22 +251,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				PX: 500,
 				NX: true
 			});
-            return apiResponse;
-        }
-    }
-
-    async function getBlock(numOrId) {
-		const key = `${CHAIN_ID_HEX}_get_block:${numOrId}`
-		const cachedData = await fastify.redis.get(key);
-        if (cachedData) {
-            return JSON.parse(cachedData);
-        } else {
-            const apiResponse = await fastify.eosjsRpc.get_block(numOrId);
-			if (apiResponse) {
-				await fastify.redis.set(key, JSON.stringify(apiResponse), {
-					PX: 5000
-				})
-			}
             return apiResponse;
         }
     }

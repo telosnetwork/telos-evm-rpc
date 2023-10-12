@@ -1,13 +1,12 @@
 import {fastify, FastifyInstance, FastifyListenOptions} from "fastify";
 import fastifyTraps from '@dnlup/fastify-traps'
 import fastifyCors from '@fastify/cors'
-import fetch from "node-fetch";
 import Common, {default as ethCommon} from '@ethereumjs/common';
 import {createLogger} from "./util/logger";
 import evmRoute from './routes/evm'
 import {RedisClientConnection, TelosEvmConfig} from "./types";
 import WebsocketRPC from "./ws/WebsocketRPC";
-import {JsonRpc} from 'eosjs';
+//import {JsonRpc} from 'eosjs';
 import {
     APIClient,
     FetchProvider,
@@ -19,9 +18,9 @@ import { createClient } from 'redis'
 
 import {RedisClientOptions} from "@redis/client";
 import {ClientOptions} from "@elastic/elasticsearch/lib/client";
+import {TelosEvmApi} from "./telosevm-js/telosevm-js";
 
 const logger = createLogger(`telos-evm-rpc`)
-const {TelosEvmApi} = require('@telosnetwork/telosevm-js');
 
 export default class TelosEVMRPC {
     debug = false;
@@ -56,7 +55,7 @@ export default class TelosEVMRPC {
             timeout: 3000
         })
 
-        this.fastify.decorate('eosjsRpc', new JsonRpc(this.config.nodeos_read))
+        //this.fastify.decorate('eosjsRpc', new JsonRpc(this.config.nodeos_read))
         this.fastify.decorate('redis', await this.createRedisClient())
         this.fastify.decorate('elastic', this.createElasticsearchClient())
         await this.addRoutes();
@@ -79,12 +78,13 @@ export default class TelosEVMRPC {
         this.fastify.decorate('evm', new TelosEvmApi({
             // TODO: maybe this should be nodeos_write?  Need to check where we use fastify.evm and what it should be,
             //  possibly split up what we do so we have more granular control of which node type we use for which type of calls
-            endpoint: this.config.nodeos_read,
-            chainId: this.config.chainId,
-            ethPrivateKeys: [],
-            fetch: fetch,
+            nodeos_read: this.config.nodeos_read,
+            nodeos_write: this.config.nodeos_write,
+            evmChainId: this.config.chainId,
+            antelopeChainId: this.config.antelopeChainId,
             telosContract: this.config.contracts.main,
-            telosPrivateKeys: [this.config.signer_key],
+            telosPrivateKey: this.config.signer_key,
+            signingAccount: this.config.signer_account,
             signingPermission: this.config.signer_permission
         }));
         this.fastify.evm.setDebug(this.config.debug);
