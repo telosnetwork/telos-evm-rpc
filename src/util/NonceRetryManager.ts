@@ -3,7 +3,7 @@ import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
 import {addHexPrefix} from "@ethereumjs/util";
 import * as ws from "ws";
-import {TelosEvmApi} from "../telosevm-js/telosevm-js";
+import {TelosEvmApi} from "../telosevm-js/telos";
 
 interface FailedTrx {
     sender: string;
@@ -21,14 +21,16 @@ export default class NonceRetryManager {
     private opts: TelosEvmConfig;
     private fastify: FastifyInstance;
     private makeTrxVars: Function;
+    private getInfo: Function;
     private queuedSenders: Map<string, FailedTrxList>;
     private retryTimeout: number;
-    constructor(opts: TelosEvmConfig, telosJs: TelosEvmApi, fastify: FastifyInstance, makeTrxVars: Function) {
+    constructor(opts: TelosEvmConfig, telosJs: TelosEvmApi, fastify: FastifyInstance, makeTrxVars: Function, getInfo: Function) {
         this.telosEvmJs = telosJs;
         this.opts = opts;
         this.retryTimeout = opts.orderNonceRetryTimeout || 60000;
         this.fastify = fastify;
         this.makeTrxVars = makeTrxVars;
+        this.getInfo = getInfo
         this.queuedSenders = new Map();
     }
 
@@ -107,11 +109,12 @@ export default class NonceRetryManager {
     private async sendRawTrx(failedTx: FailedTrx): Promise<boolean> {
         try {
             failedTx.lastRetry = Date.now();
-            const rawResponse = await this.telosEvmJs.telos.raw({
+            const rawResponse = await this.telosEvmJs.raw({
                 account: this.opts.signer_account,
                 tx: failedTx.rawTx,
-                ram_payer: this.telosEvmJs.telos.telosContract,
-                trxVars: await this.makeTrxVars()
+                ram_payer: this.telosEvmJs.telosContract,
+                trxVars: await this.makeTrxVars(),
+                getInfoResponse: await this.getInfo()
             });
             return true;
         } catch (e) {

@@ -2,6 +2,7 @@ import {createClient, createCluster} from "redis";
 
 export interface TelosEvmConfig {
     chainId: number;
+    blockNumberDelta: number;
     antelopeChainId: string;
     debug: boolean;
     apiHost: string;
@@ -11,6 +12,7 @@ export interface TelosEvmConfig {
     signer_account: string;
     signer_permission: string;
     signer_key: string;
+    retryTrxNumBlocks: number;
     contracts: {
         main: string;
     }
@@ -30,6 +32,9 @@ export interface TelosEvmConfig {
     elasticIndexVersion: string;
     orderNonces: boolean;
     orderNonceRetryTimeout: number;
+    syncingThreshhold: number;
+    acceptableLibLag: number;
+    acceptableHeadLagMs: number;
 }
 
 /** A conventional Redis connection. */

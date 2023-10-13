@@ -1,14 +1,19 @@
-/*
-import { Api, JsonRpc } from 'eosjs'
-import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig'
-import { TextEncoder, TextDecoder } from 'text-encoding'
- */
 import { Account } from './interfaces'
 import * as ethTx from '@ethereumjs/tx'
 const { Transaction } = ethTx
 import Common from '@ethereumjs/common'
-import { ETH_CHAIN, FORK } from './constants'
-import {APIClient, AnyAction, Checksum256, FetchProvider, PrivateKey, Transaction as AntelopeTransaction, SignedTransaction, Action} from "@wharfkit/antelope"
+import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
+import {
+  API,
+  APIClient,
+  AnyAction,
+  Checksum256,
+  FetchProvider,
+  PrivateKey,
+  Transaction as AntelopeTransaction,
+  SignedTransaction,
+  Action, ABI,
+} from "@wharfkit/antelope"
 
 const BN = require('bn.js')
 
@@ -51,57 +56,47 @@ class GasEstimateError extends Error { }
  * @param {Array<string>} args.endpoint Telos RPC endpoint
  * @param {Array<string>} args.telosContract Telos contract name with EVM
  */
-export class TelosApi {
-  //signatureProvider: any
+export class TelosEvmApi {
   chainId: Checksum256
   signingPermission: string
   signingKey: PrivateKey
-  //rpc: any
-  //api: any
   writeAPI: APIClient
   readAPI: APIClient
   telosContract: string
   chainConfig: any
   debug: boolean
+  private abi: ABI.Def
+  private retryTrxNumBlocks: number
 
   constructor({
     telosPrivateKey,
-    signingAccount,
     signingPermission,
     nodeos_read,
     nodeos_write,
     telosContract,
     evmChainId,
-    antelopeChainId
+    antelopeChainId,
+    retryTrxNumBlocks
   }: {
     telosPrivateKey: string
-    signingAccount?: string
     signingPermission?: string
     nodeos_read: string
     nodeos_write: string
     telosContract: string
     evmChainId: any
     antelopeChainId: string
+    retryTrxNumBlocks: number
   }) {
     this.readAPI = new APIClient({
       provider: new FetchProvider(nodeos_read)
     })
-    //this.signatureProvider = new JsSignatureProvider(this.telosPrivateKeys)
     this.signingPermission = signingPermission || 'active'
     this.writeAPI =  new APIClient({
       provider: new FetchProvider(nodeos_write)
     })
+    this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    /*
-    this.rpc = new JsonRpc(endpoint, { fetch: fetch as any })
-    this.api = new Api({
-      rpc: this.rpc,
-      signatureProvider: this.signatureProvider,
-      textEncoder: new TextEncoder() as any,
-      textDecoder: new TextDecoder() as any
-    })
-     */
     this.chainConfig = Common.forCustomChain(ETH_CHAIN, { chainId: evmChainId }, FORK)
     this.telosContract = telosContract
     this.debug = false
@@ -114,7 +109,7 @@ export class TelosApi {
   throwError(error: any, defaultMessage: string) {
     let errorMessage = defaultMessage
     const assertionPrefix = `assertion failure with message:`;
-    if (error.details[0].message.startsWith(assertionPrefix))
+    if (error?.details && error?.details?.length > 1 && error?.details[0]?.message?.startsWith(assertionPrefix))
       errorMessage = error.details[0].message.substring(assertionPrefix.length)
 
     throw new Error(errorMessage)
@@ -161,16 +156,16 @@ export class TelosApi {
   /**
    * Bundles actions into a transaction to send to Telos Api
    *
-   * @param {any[]} actionsFull Telos actions
-   * @param {Api} api An optional Api instance to use for sending the transaction
    * @returns {Promise<any>} EVM receipt and Telos receipt
+   * @param actions
+   * @param trxVars
+   * @param getInfoResponse
+   * @param api
    */
-  async transact(actions: AnyAction[], trxVars?: TransactionVars) {
+  async transact(actions: AnyAction[], trxVars: TransactionVars, getInfoResponse: API.v1.GetInfoResponse, api: APIClient): Promise<API.v1.SendTransaction2Response> {
     try {
       let transaction: AntelopeTransaction
-
-      // some ABI caching here would prevent excess calls, either that or an abi2core struct
-      const {abi} = await this.readAPI.v1.chain.get_abi(this.telosContract)
+      const abi = await this.getAbi()
 
       if (trxVars) {
         transaction = AntelopeTransaction.from({
@@ -178,9 +173,6 @@ export class TelosApi {
             actions: actions.map((action) => Action.from(action, abi))
         })
       } else {
-        // This should be changed to use the getInfo from fastity
-        // I didn't want to change how that's exported, so just put in a raw call for it here
-        const getInfoResponse = await this.readAPI.v1.chain.get_info()
         transaction = AntelopeTransaction.from({
             ...getInfoResponse.getTransactionHeader(45),
             actions: actions.map((action) => Action.from(action, abi))
@@ -194,7 +186,13 @@ export class TelosApi {
         signatures: [signature],
       })
 
-      const result = await this.writeAPI.v1.chain.send_transaction2(signed)
+      const start = Date.now()
+      const result = await api.v1.chain.send_transaction2(signed, {
+        return_failure_trace: true,
+        retry_trx: true,
+        retry_trx_num_blocks: this.retryTrxNumBlocks
+      })
+      console.log(`send_transaction2 took ${Date.now() - start}ms`)
 
       if (this.debug) {
         try {
@@ -236,13 +234,15 @@ export class TelosApi {
     tx,
     sender,
     ram_payer,
-    trxVars
+    trxVars,
+    getInfoResponse
   }: {
     account: string
     tx: string
     sender?: string
     ram_payer?: string
-    trxVars?: TransactionVars
+    trxVars: TransactionVars
+    getInfoResponse: API.v1.GetInfoResponse
   }) {
     if (tx && tx.startsWith('0x')) tx = tx.substring(2)
     if (sender && sender.startsWith('0x')) sender = sender.substring(2)
@@ -265,7 +265,7 @@ export class TelosApi {
         },
         authorization: [{ actor: account, permission: this.signingPermission }]
       }
-    ], trxVars)
+    ], trxVars, getInfoResponse, this.writeAPI)
 
     if (this.debug) {
       console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
@@ -280,25 +280,6 @@ export class TelosApi {
       transaction: trx,
       from: sender
     }
-
-    /*
-    try {
-      response.eth = JSON.parse(
-        response.telos.processed.action_traces[0].console
-      )
-    } catch (e) {
-      response.eth = ''
-      console.log(
-        'Could not parse',
-        response.telos.processed.action_traces[0].console
-      )
-    }
-
-    if (response.eth === '') {
-      console.warn('Warning: This node may have console printing disabled')
-    }
-
-    */
 
     return response
   }
@@ -319,20 +300,22 @@ export class TelosApi {
     tx,
     sender,
     ram_payer,
-    trxVars
+    trxVars,
+    getInfoResponse
   }: {
     account: string
     tx: string
     sender?: string
     ram_payer?: string
-    trxVars?: TransactionVars
+    trxVars: TransactionVars
+    getInfoResponse: API.v1.GetInfoResponse
   }) {
     if (tx && tx.startsWith('0x')) tx = tx.substring(2)
     if (sender && sender.startsWith('0x')) sender = sender.substring(2)
     if (!ram_payer) ram_payer = account
 
     try {
-      await this.transact([
+      const result = await this.transact([
         {
           account: this.telosContract,
           name: 'raw',
@@ -344,52 +327,68 @@ export class TelosApi {
           },
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
-      ], trxVars)
+      ], trxVars, getInfoResponse, this.writeAPI)
+      const consolePrinting = this.getConsoleFromSendTransaction2Response(result)
+      return this.handleEstimateGasConsole(consolePrinting)
     } catch (e: any) {
-      const error = e.json.error
-      if (error.code !== 3050003) {
-        throw new Error('This node does not have console printing enabled')
+      const error = e?.response?.json?.error
+      if (error?.code !== 3050003) {
+        throw new Error(`Error while estimating gas: ${e.message}`)
       }
       // TODO: there isn't always pending console output, so accessing message.match(/(0[xX][0-9a-fA-F]*)$/)[0] will fail, the real error message is somewhere else in the error, see example:
-      const message = error.details[1].message
-      const result = message.match(/(0[xX][0-9a-fA-F]*)$/)
-
-      let receiptLog = message.slice(
-          message.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length,
-          message.indexOf(RECEIPT_LOG_END)
-      );
-
-      let receipt;
-      try {
-        receipt = JSON.parse(receiptLog);
-      } catch (e) {
-        console.log('WARNING: Failed to parse receiptLog in estimate gas');
-      }
-
-      if (receipt.status === 0) {
-        let e = new GasEstimateError("Gas estimation transaction failure");
-        e.receipt = receipt;
-        throw e;
-      }
-
-      if (result) {
-        if (!receipt.gasused) {
-          return result[0]
-        }
-
-        let resultInt = parseInt(result[0], 16);
-        let receiptInt = parseInt(receipt.gasused, 16);
-        return receiptInt > resultInt ? `0x${receipt.gasused}` : result[0];
-      } else {
-        if (receipt && receipt.hasOwnProperty('gasused')) {
-          return `0x${receipt.gasused}`
-        }
-      }
-
-      let defaultMessage = `Server Error: Failed to estimate gas`
-      this.throwError(error, defaultMessage)
+      const message = error?.details[1]?.message
+      return this.handleEstimateGasConsole(message)
     }
   }
+
+  // TODO: figure out how to cast response to SendTransaction2Response once except is defined on it
+  getConsoleFromSendTransaction2Response(response: any) {
+    if (response?.processed?.except?.code !== 3050003) {
+      throw new Error(`Unable to get console output from SendTransaction2Response`)
+    } else {
+      return response.processed.except.stack[1].data.console
+    }
+  }
+
+  handleEstimateGasConsole(message): string {
+    const result = message.match(/(0[xX][0-9a-fA-F]*)$/)
+
+    let receiptLog = message.slice(
+        message.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length,
+        message.indexOf(RECEIPT_LOG_END)
+    );
+
+    let receipt;
+    try {
+      receipt = JSON.parse(receiptLog);
+    } catch (e) {
+      console.log('WARNING: Failed to parse receiptLog in estimate gas');
+    }
+
+    if (receipt?.status === 0) {
+      let e = new GasEstimateError("Gas estimation transaction failure");
+      e.receipt = receipt;
+      throw e;
+    }
+
+    if (result && result.length > 0) {
+      if (!receipt.gasused) {
+        return result[0]
+      }
+
+      let resultInt = parseInt(result[0], 16);
+      let receiptInt = parseInt(receipt.gasused, 16);
+      return receiptInt > resultInt ? `0x${receipt.gasused}` : result[0];
+    } else {
+      if (receipt && receipt.hasOwnProperty('gasused')) {
+        return `0x${receipt.gasused}`
+      }
+    }
+
+    let defaultMessage = `Server Error: Failed to estimate gas`
+    this.throwError(new Error(`Could not get gas estimation from message: ${message}`), defaultMessage)
+  }
+
 
   /**
    * Sends a non state modifying call to EVM
@@ -406,13 +405,15 @@ export class TelosApi {
     tx,
     sender,
     ram_payer,
-    trxVars
+    trxVars,
+    getInfoResponse
   }: {
     account: string
     tx: string
     sender?: string
     ram_payer?: string
-    trxVars?: TransactionVars
+    trxVars: TransactionVars
+    getInfoResponse: API.v1.GetInfoResponse
   }) {
     if (tx && tx.startsWith('0x')) tx = tx.substring(2)
     if (sender && sender.startsWith('0x')) sender = sender.substring(2)
@@ -431,7 +432,7 @@ export class TelosApi {
           },
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
-      ], trxVars)
+      ], trxVars, getInfoResponse, this.writeAPI)
     } catch (e: any) {
       const error = e.json.error
       if (error.code !== 3050003) {
@@ -542,4 +543,96 @@ export class TelosApi {
     return `0x${account.nonce.toString(16)}`
   }
 
+  /**
+   * Fetches the on-chain storage value at address and key
+   *
+   * @param address The ETH address in EVM contract
+   * @param key Storage key
+   *
+   * @returns {Promise<AccountState>} account state row containing key and value
+   */
+  async getStorageAt(address: string, key: string) {
+    if (!address || !key) throw new Error('Both address and key are required')
+    if (address && address.startsWith('0x')) address = address.substring(2)
+
+    if (key && key.startsWith('0x')) key = key.substring(2)
+    const paddedKey = '0'.repeat(64 - key.length) + key
+
+    const acc = await this.getEthAccount(address)
+    if (!acc)
+      return '0x0';
+
+    const { rows } = await this.getTable({
+      code: this.telosContract,
+      scope: acc.index,
+      table: 'accountstate',
+      key_type: 'sha256',
+      index_position: 2,
+      lower_bound: paddedKey,
+      upper_bound: paddedKey,
+      limit: 1
+    })
+
+    if (rows.length && rows[0].key === paddedKey) {
+      return '0x' + rows[0].value
+    } else {
+      return '0x0'
+    }
+  }
+
+  /**
+   * Generates RLP encoded transaction sender parameters
+   *
+   * @param {object} [args={}] Arguments
+   * @param {string} [args.sender]  The ETH address sending the transaction (nonce is fetched on-chain for this address)
+   * @param {object} [args.data] The data in transaction
+   * @param {string} [args.gasLimit]  The gas limit of the transaction
+   * @param {string} [args.value]  The value in the transaction
+   * @param {string} [args.to]  The ETH address to send transaction to
+   *
+   * @returns {Promise<string>}RLP encoded transaction
+   */
+  async createEthTx({
+                      sender,
+                      data,
+                      gasLimit,
+                      value,
+                      to,
+                    }: {
+    sender?: string
+    data?: string
+    gasLimit?: string | Buffer
+    value?: number | Buffer
+    to?: string
+  }) {
+    const nonce = await this.getNonce(sender)
+    const gasPrice = await this.getGasPrice()
+    const txData = {
+      nonce,
+      gasPrice: `0x${gasPrice.toString(16)}`,
+      gasLimit:
+          gasLimit !== undefined
+              ? `0x${(gasLimit as any).toString(16)}`
+              : DEFAULT_GAS_LIMIT,
+      value:
+          value !== undefined
+              ? `0x${(value as any).toString(16)}`
+              : DEFAULT_VALUE,
+      to,
+      data
+    }
+
+    const tx = new Transaction(txData, { common: this.chainConfig })
+
+    return tx.serialize().toString('hex')
+  }
+
+  private async getAbi(): Promise<ABI.Def> {
+    if (!this.abi) {
+      const abiResponse = await this.readAPI.v1.chain.get_abi(this.telosContract)
+      this.abi = abiResponse.abi
+    }
+
+    return this.abi
+  }
 }

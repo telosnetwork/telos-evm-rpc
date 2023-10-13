@@ -17,7 +17,7 @@ import { createClient } from 'redis'
 
 import {RedisClientOptions} from "@redis/client";
 import {ClientOptions} from "@elastic/elasticsearch/lib/client";
-import {TelosEvmApi} from "./telosevm-js/telosevm-js";
+import {TelosEvmApi} from "./telosevm-js/telos";
 
 const logger = createLogger(`telos-evm-rpc`)
 
@@ -83,7 +83,7 @@ export default class TelosEVMRPC {
             antelopeChainId: this.config.antelopeChainId,
             telosContract: this.config.contracts.main,
             telosPrivateKey: this.config.signer_key,
-            signingAccount: this.config.signer_account,
+            retryTrxNumBlocks: this.config.retryTrxNumBlocks,
             signingPermission: this.config.signer_permission
         }));
         this.fastify.evm.setDebug(this.config.debug);
