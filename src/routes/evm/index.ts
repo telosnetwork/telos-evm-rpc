@@ -1075,7 +1075,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				let err = new TransactionError('Transaction error');
 				let output = addHexPrefix(receipt.output);
 				if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
-					return addHexPrefix(rawResponse.eth.transactionHash);
+					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string \'${parseRevertReason(output)}\'`;
 				} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
 					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string \'${parsePanicReason(output)}\'`;
 				} else {
