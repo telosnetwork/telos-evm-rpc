@@ -10,7 +10,7 @@ import {
 	makeLogObject,
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, reverseHex
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -28,6 +28,7 @@ import {
 	Struct,
 	Transaction, Bytes, Checksum160
 } from '@wharfkit/antelope'
+import NonceRetryManager from "../../util/NonceRetryManager";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -214,8 +215,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	let Logger = new DebugLogger(opts.debug);
 
+	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm, fastify, makeTrxVars);
+	nonceRetryManager.start();
 
-    // Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
+	// Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
     // TODO: Maybe cache the ABI here if eosjs doesn't already
     //   similar to https://raw.githubusercontent.com/JakubDziworski/Eos-Offline-Transaction-Example/master/src/tx-builder.ts
     const privateKeys = [opts.signer_key]
@@ -242,7 +245,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     // AUX FUNCTIONS
 
     async function getInfo(): Promise<API.v1.GetInfoResponse> {
-		const key = `get_info`
+		const key = `${CHAIN_ID_HEX}_get_info`
 		const cachedData = await fastify.redis.get(key)
         if (cachedData) {
 			return API.v1.GetInfoResponse.from(JSON.parse(cachedData));
@@ -258,7 +261,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     }
 
     async function getBlock(numOrId) {
-		const key = `get_block:${numOrId}`
+		const key = `${CHAIN_ID_HEX}_get_block:${numOrId}`
 		const cachedData = await fastify.redis.get(key);
         if (cachedData) {
             return JSON.parse(cachedData);
@@ -281,12 +284,23 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             .toString()
 
         const getInfoResponse = await getInfo()
+		const header = getInfoResponse.getTransactionHeader(45);
+		return {
+			expiration: header.expiration.toString(),
+			ref_block_num: header.ref_block_num.toNumber(),
+			ref_block_prefix: header.ref_block_prefix.toNumber()
+		}
+
+		/*
         const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
-        return {
+		const prefix = parseInt(reverseHex(getInfoResponse.last_irreversible_block_id.toString().substring(16, 24)), 16);
+
+		return {
             expiration,
-            ref_block_num: getBlockResponse.block_num,
-            ref_block_prefix: getBlockResponse.ref_block_prefix,
+            ref_block_num: getInfoResponse.last_irreversible_block_num.toNumber() & 0xffff,
+            ref_block_prefix: prefix,
         }
+		 */
     }
 
 	async function getVRS(receiptDoc): Promise<any> {
@@ -528,7 +542,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
-			const key = `last_onchain_block`;
+			const key = `${CHAIN_ID_HEX}_last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData) {
@@ -548,7 +562,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			const key = `last_indexed_block`;
+			const key = `${CHAIN_ID_HEX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData)
@@ -898,7 +912,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
      * Returns the current gas price in wei.
      */
     methods.set('eth_gasPrice', async () => {
-		const key = `gas_price`;
+		const key = `${CHAIN_ID_HEX}_gas_price`;
 		const cachedData = await fastify.redis.get(key);
         if (cachedData) {
             return cachedData;
@@ -1049,7 +1063,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				account: opts.signer_account,
 				tx: signedTx,
 				ram_payer: fastify.evm.telos.telosContract,
-			}, fastify.cachingApi, await makeTrxVars());
+				api: fastify.cachingApi,
+				trxVars: await makeTrxVars()
+			});
 
 			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
 
@@ -1078,6 +1094,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			return addHexPrefix(rawResponse.eth.transactionHash);
 		} catch (e) {
+			if (opts.orderNonces) {
+				const assertionMessage = e?.details[0]?.message
+				if (assertionMessage && assertionMessage.includes('incorrect nonce')) {
+					return nonceRetryManager.submitFailedRawTrx(signedTx);
+				}
+			}
+
 			if (e instanceof TransactionError)
 				throw e;
 
