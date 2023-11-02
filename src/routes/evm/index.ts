@@ -10,6 +10,7 @@ import {
 	makeLogObject,
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
+	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, reverseHex
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
@@ -487,7 +488,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const block = await getBlockByNumber(blockNum);
         const timestamp = new Date(block['@timestamp']).getTime() / 1000;
         const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
-        const gasLimitBlock = addHexPrefix(removeLeftZeros(new BN(block['gasLimit']).toString('hex')));
         const extraData = addHexPrefix(block['@blockHash']);
         const blockSize = addHexPrefix(block['size'].toString(16));
         const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
@@ -496,7 +496,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		return Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: gasUsedBlock,
-            gasLimit: gasLimitBlock,
+            gasLimit: BLOCK_GAS_LIMIT,
 			parentHash: parentHash,
 			hash: blockHash,
 			logsBloom: logsBloom,
@@ -643,12 +643,25 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			},
 			result: {
 				gasUsed: addHexPrefix(itx.gasUsed),
-				output: addHexPrefix(itx.output),
 			},
 			subtraces: parseInt(itx.subtraces),
 			traceAddress: itx.traceAddress,
 			type: itx.type
 		}
+
+		if(itx.init)
+			trace.action.init = addHexPrefix(itx.init);
+
+		if(itx.address)
+			trace.result.address = addHexPrefix(itx.address);
+
+		if(itx.code && itx.code !== "0")
+			trace.result.code = addHexPrefix(itx.code);
+		else if(itx.output)
+			trace.result.output = addHexPrefix(itx.output);
+
+		if(itx.error?.length > 0)
+			trace.error = itx.error;
 
 		if (itx.to)
 			trace.action.to = toLowerCaseAddress(itx.to);
@@ -664,12 +677,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function makeTraces(receipt, adHoc) {
-		// TODO: include the main transaction as the 0th trace per:
-		//    https://github.com/ledgerwatch/erigon/issues/1119#issuecomment-693722124
+
+		receipt['itxs'] = receipt['itxs'].filter(item => item.traceAddress.length > 0);
+
 		const results = [
 			makeInitialTrace(receipt, adHoc)
 		];
 		for (const itx of receipt['itxs']) {
+			// Internal transactions should have a trace address, they aren't the initial trace
+			if(itx.traceAddress.length === 0)
+				continue;
+
 			results.push(makeTrace(receipt, itx, adHoc));
 		}
 
@@ -808,7 +826,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the value from a storage position at a given address.
 	 */
 	methods.set('eth_getStorageAt', async ([address, position]) => {
-		return await fastify.evm.telos.getStorageAt(address.toLowerCase(), position);
+		const value = await fastify.evm.telos.getStorageAt(address.toLowerCase(), position);
+		return (value === '0x0') ? '0x0000000000000000000000000000000000000000000000000000000000000000' : value;
 	});
 
 	/**
@@ -823,7 +842,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const account = await fastify.evm.telos.getEthAccount(txParams.from.toLowerCase());
 		if (!account) {
 			let err = new TransactionError('Insufficient funds');
-			err.errorMessage = 'The sender address has a zero balance';
+			err.errorMessage = 'insufficient funds for gas * price + value';
 			throw err;
 		}
 
@@ -858,24 +877,32 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			//let toReturn = `0x${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			return removeLeftZeros(toReturn);
 		} catch (e) {
-			console.log(e);
-			console.log(e.receipt.itxs);
-			handleGasEstimationError(e.receipt.output);
+			if(e.receipt){
+				handleGasEstimationError(e.receipt);
+			}
 		}
 	});
 
-	function handleGasEstimationError(output) {
+	function handleGasEstimationError(receipt) {
 		let err = new TransactionError('Transaction reverted');
-		err.data = output;
+		err.data = receipt.output;
 
-        output = addHexPrefix(output);
+        let output = addHexPrefix(receipt.output);
 
 		if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 			err.errorMessage = `execution reverted: ${parseRevertReason(output)}`;
 		} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
 			err.errorMessage = `execution reverted: ${parsePanicReason(output)}`;
 		} else {
-			err.errorMessage = `execution reverted without reason provided`
+			if(receipt.errors.length > 0){
+				err.errorMessage = `execution reverted: `;
+				for(let i in receipt.errors){
+					err.errorMessage += receipt.errors[i] + ', ';
+				}
+				err.errorMessage = err.errorMessage.slice(0, -2);
+			} else {
+				err.errorMessage = `execution reverted without reason provided`;
+			}
 		}
 
 		throw err;
@@ -1044,14 +1071,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
 			let receipt = JSON.parse(receiptLog);
-
 			if (receipt.status === 0) {
 				let err = new TransactionError('Transaction error');
 				let output = addHexPrefix(receipt.output);
 				if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
-					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string '${parseRevertReason(output)}'`;
+					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string \'${parseRevertReason(output)}\'`;
 				} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
-					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string '${parsePanicReason(output)}'`;
+					err.errorMessage = `Error: VM Exception while processing transaction: reverted with reason string \'${parsePanicReason(output)}\'`;
 				} else {
 					// Borrowed message from hardhat node
 					if (receipt?.errors?.length > 0 && receipt.errors[0].toLowerCase().indexOf('revert') !== -1)
@@ -1086,13 +1112,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Submits transaction for broadcast to the Ethereum network.
 	 */
 	methods.set('eth_sendTransaction', async ([txParams]) => {
-		const buf = Buffer.from(txParams.value.slice(2), "hex");
-		const encodedTx = await fastify.evm.createEthTx({
+		let params = {
 			...txParams,
-			value: new BN(buf),
 			rawSign: true,
 			sender: txParams.from,
-		});
+		}
+		if(txParams.value){
+			params.value = new BN(Buffer.from(txParams.value.slice(2), "hex"))
+		}
+		const encodedTx = await fastify.evm.createEthTx(params);
 		try {
 			const rawData = await fastify.evm.telos.raw({
 				account: opts.signer_account,
@@ -1101,7 +1129,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			});
 			return addHexPrefix(rawData.eth.transactionHash);
 		} catch (e) {
-			console.log(e);
 			return null;
 		}
 	});
