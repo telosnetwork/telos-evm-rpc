@@ -10,6 +10,7 @@ import {
 	makeLogObject,
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
+	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, reverseHex
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
@@ -487,7 +488,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const block = await getBlockByNumber(blockNum);
         const timestamp = new Date(block['@timestamp']).getTime() / 1000;
         const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
-        const gasLimitBlock = addHexPrefix(removeLeftZeros(new BN(block['gasLimit']).toString('hex')));
         const extraData = addHexPrefix(block['@blockHash']);
         const blockSize = addHexPrefix(block['size'].toString(16));
         const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
@@ -496,7 +496,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		return Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: gasUsedBlock,
-            gasLimit: gasLimitBlock,
+            gasLimit: BLOCK_GAS_LIMIT,
 			parentHash: parentHash,
 			hash: blockHash,
 			logsBloom: logsBloom,
