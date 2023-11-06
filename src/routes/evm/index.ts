@@ -1802,7 +1802,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const clientInfo = {
 			ip, origin, usage, limit
 		}
-		console.log(clientInfo);
 
 		return await doRpcPayload(request.body, clientInfo, reply);
 	});
