@@ -11,7 +11,7 @@ import {
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
 	BLOCK_GAS_LIMIT,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, reverseHex
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -199,13 +199,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	const methods: Map<string, (params?: any) => Promise<any> | any> = new Map();
 	const decimalsBN = new BN('1000000000000000000');
 	const zeros = "0x0000000000000000000000000000000000000000";
-	const chainAddr = [
-		"0xb1f8e55c7f64d203c1400b9d8555d050f94adf39",
-		"0x9f510b19f1ad66f0dcf6e45559fab0d6752c1db7",
-		"0xb8e671734ce5c8d7dfbbea5574fa4cf39f7a54a4",
-		"0xb1d3fbb2f83aecd196f474c16ca5d9cffa0d0ffc",
-	];
-	const chainIds = [1, 3, 4, 42];
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
 
@@ -592,7 +585,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function makeInitialTrace(receipt, adHoc) {
-		let gas = addHexPrefix((receipt['gasused'] as number).toString(16))
+		let gas = addHexPrefix((receipt['gasused'] as number).toString(16);
+		let subtraces = 0;
+		for(let i = 0; i < receipt.itxs.length; i++){
+			if(receipt.itxs[i].traceAddress.length === 1){
+				subtraces++;
+			}
+		}
 		let trace: any = {
 			action: {
 				callType: 'call',
@@ -605,7 +604,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				gasUsed: gas,
 				output: addHexPrefix(receipt.output),
 			},
-			subtraces: receipt.itxs.length,
+			subtraces: subtraces,
 			traceAddress: [],
 			type: 'call'
 		}
@@ -1782,6 +1781,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	fastify.post('/evm', { schema }, async (request: FastifyRequest, reply: FastifyReply) => {
 		let origin;
+		console.log(request.headers);
 		if (request.headers['origin'] === METAMASK_EXTENSION_ORIGIN) {
 			origin = 'MetaMask';
 		} else {
