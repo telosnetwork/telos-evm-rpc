@@ -190,13 +190,13 @@ export default class WebsocketRPC {
 
     handleHeadMessage(head): void {
         const headMessage = {
-                "jsonrpc": "2.0",
-                "method": "eth_subscription",
-                "params": {
-                    "subscription": this.headSubscription.getId(),
-                    "result": head
-                }
-            };
+            "jsonrpc": "2.0",
+            "method": "eth_subscription",
+            "params": {
+                "subscription": this.headSubscription.getId(),
+                "result": head
+            }
+        };
 
         this.headSubscription.publish(JSON.stringify(headMessage));
     }
