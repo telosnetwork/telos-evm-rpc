@@ -585,7 +585,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function makeInitialTrace(receipt, adHoc) {
-		let gas = addHexPrefix((receipt['gasused'] as number).toString(16);
+		let gas = addHexPrefix((receipt['gasused'] as number).toString(16));
 		let subtraces = 0;
 		for(let i = 0; i < receipt.itxs.length; i++){
 			if(receipt.itxs[i].traceAddress.length === 1){
@@ -1781,7 +1781,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	fastify.post('/evm', { schema }, async (request: FastifyRequest, reply: FastifyReply) => {
 		let origin;
-		console.log(request.headers);
+		//console.log(request.headers);
 		if (request.headers['origin'] === METAMASK_EXTENSION_ORIGIN) {
 			origin = 'MetaMask';
 		} else {
