@@ -138,6 +138,9 @@ export function toChecksumAddress(address) {
 export function buildLogsObject(logs: any[], blHash: string, blNumber: string, txHash: string, txIndex: string): EthLog[] {
     const _logs: EthLog[] = [];
     if (logs) {
+        if(isHexPrefixed(txHash) === false) {
+            txHash = '0x' + txHash;
+        }
         let counter = 0;
         for (const log of logs) {
             _logs.push({
@@ -158,6 +161,10 @@ export function buildLogsObject(logs: any[], blHash: string, blNumber: string, t
 }
 
 export function makeLogObject(rawActionDocument, log, forSubscription) {
+    let trx = rawActionDocument['@raw']['hash'];
+    if(!isHexPrefixed(trx)) {
+        trx = '0x' + trx;
+    }
     let baseLogObj = {
         address: toChecksumAddress('0x' + log.address),
         blockHash: '0x' + rawActionDocument['@raw']['block_hash'],
@@ -165,7 +172,7 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
         data: '0x' + log.data,
         logIndex: numToHex(log.logIndex),
         topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
-        transactionHash: rawActionDocument['@raw']['hash'],
+        transactionHash: trx,
         transactionIndex: numToHex(rawActionDocument['@raw']['trx_index'])
     }
 

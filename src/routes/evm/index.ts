@@ -11,7 +11,7 @@ import {
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
 	BLOCK_GAS_LIMIT,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed
 } from "../../util/utils"
 import DebugLogger from "../../debugLogging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -66,7 +66,6 @@ class Refund extends Struct {
 		}
 	]
 }
-
 
 function parseRevertReason(revertOutput) {
 	if (!revertOutput || revertOutput.length < 138) {
@@ -310,7 +309,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		Logger.log(`searching action by hash: ${trxHash}`)
 		try {
 			let _hash = trxHash.toLowerCase();
-			if (_hash.startsWith("0x")) {
+			if (isHexPrefixed(_hash)) {
 				_hash = _hash.slice(2);
 			}
 			const results = await fastify.elastic.search({
@@ -334,7 +333,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function searchDeltasByHash(trxHash: string): Promise<any> {
 		try {
 			let _hash = trxHash.toLowerCase();
-			if (_hash.startsWith("0x")) {
+			if (isHexPrefixed(_hash)) {
 				_hash = _hash.slice(2);
 			}
 			const results = await fastify.elastic.search({
@@ -727,7 +726,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (typeof blockParam === 'number') {
 			// We were passed a number, convert to hex string
 			return addHexPrefix((blockParam as number).toString(16));
-		} else if (!blockParam.startsWith('0x')) {
+		} else if (!isHexPrefixed(blockParam)) {
 			// Assume this is a number as string, missing the hex prefix, parse number and turn to hex string
 			return addHexPrefix(parseInt(blockParam, 10).toString(16))
 		} else {
@@ -978,8 +977,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let tx = await fastify.evm.createEthTx(obj);
 		let sender = txParams.from
 
-		if (tx && tx.startsWith('0x')) tx = tx.substring(2)
-		if (sender && sender.startsWith('0x')) sender = sender.substring(2)
+		if (tx && isHexPrefixed(tx)) tx = tx.substring(2)
+		if (sender && isHexPrefixed(sender)) sender = sender.substring(2)
 
 		if (sender && sender === '')
 			sender = undefined
@@ -1247,7 +1246,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (_hash === GENESIS_BLOCK_HASH)
 			return GENESIS_BLOCK;
 
-		if (_hash.startsWith("0x")) {
+		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
@@ -1260,7 +1259,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBlockTransactionCountByHash', async ([hash]) => {
 		let _hash = hash.toLowerCase();
-		if (_hash.startsWith("0x")) {
+		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
@@ -1314,7 +1313,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let toBlock: string | number;
 
 		if (blockHash) {
-			if (blockHash.startsWith('0x')) {
+			if (isHexPrefixed(blockHash)) {
 				blockHash = blockHash.slice(2)
 			}
 
@@ -1353,7 +1352,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					const nestedOr = {bool: {should: []}};
 
 					addressFilter = addressFilter.map(addr => {
-						if (addr.startsWith('0x'))
+						if (isHexPrefixed(addr))
 							addr = addr.slice(2);
 
 						return addr.toLowerCase();
@@ -1369,7 +1368,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 			} else {
 				addressFilter = addressFilter.toLowerCase();
-				if (addressFilter.startsWith('0x')) {
+				if (isHexPrefixed(addressFilter)) {
 					addressFilter = addressFilter.slice(2);
 				}
 				//console.log(`getLogs using address: ${addressFilter}`);
@@ -1546,7 +1545,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 								traceAddress: itx.traceAddress,
 								transactionHash: addHexPrefix(doc['@raw']['hash']),
 								transactionPosition: doc['@raw']['trx_index'],
-								type: itx.type});
+								type: itx.type
+							});
 							logCount++;
 						}
 					}
