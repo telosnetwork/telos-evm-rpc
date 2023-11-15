@@ -11,5 +11,9 @@ module.exports = {
     exp_backoff_restart_delay: 100,
     watch: false,
     time: true,
+    env: {
+      "NODE_PORT": config.apiPort,
+      "PORT": config.apiPort
+    }
   }],
 };

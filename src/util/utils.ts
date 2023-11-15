@@ -21,7 +21,54 @@ export const NULL_TRIE = '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc00162
 
 const EMPTY_LOGS = '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
 
-const BLOCK_GAS_LIMIT = '0x0'
+export const BLOCK_GAS_LIMIT = '0x7fffffff'
+
+export const GENESIS_BLOCKS = {
+    "0x28": {
+        "difficulty": "0x0",
+        "extraData": "0x00000024796a9998ec49fb788de51614c57276dc6151bd2328305dba5d018897",
+        "gasLimit": "0x0",
+        "gasUsed": "0x0",
+        "hash": "0x13f28fe4d164354cbcb0b9d8d43dff5d8e4b180e440579a55505a5fc96831c6b",
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "miner": "0x0000000000000000000000000000000000000000",
+        "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "nonce": "0x0000000000000000",
+        "number": "0x0",
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+        "size": "0x219",
+        "stateRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "timestamp": "0x5c114972",
+        "totalDifficulty": "0x0",
+        "transactions": [],
+        "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "uncles": []
+    },
+    "0x29": {
+        "difficulty": "0x0",
+        "extraData": "0x000000397128c497668c241b27d1521c764156cea50bcac87892fc8916e23b24",
+        "gasLimit": "0x0",
+        "gasUsed": "0x0",
+        "hash": "0xf5488543e19d3441f652d76cbd52014f9807d0f09bfa25422568b1cf3e30da1a",
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "miner": "0x0000000000000000000000000000000000000000",
+        "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "nonce": "0x0000000000000000",
+        "number": "0x0",
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+        "size": "0x219",
+        "stateRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "timestamp": "0x5d55db93",
+        "totalDifficulty": "0x0",
+        "transactions": [],
+        "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "uncles": []
+    }
+}
 
 const NEW_HEADS_TEMPLATE =
     {
@@ -55,6 +102,17 @@ export function numToHex(input: number | string) {
     }
 }
 
+export function toLowerCaseAddress(address) {
+    if (!address)
+        return null
+
+    address = address.toLowerCase().replace('0x', '')
+    if (address.length != 40)
+        address = address.padStart(40, "0");
+
+    return `0x${address}`
+}
+
 export function toChecksumAddress(address) {
     if (!address)
         return null
@@ -80,6 +138,9 @@ export function toChecksumAddress(address) {
 export function buildLogsObject(logs: any[], blHash: string, blNumber: string, txHash: string, txIndex: string): EthLog[] {
     const _logs: EthLog[] = [];
     if (logs) {
+        if(isHexPrefixed(txHash) === false) {
+            txHash = '0x' + txHash;
+        }
         let counter = 0;
         for (const log of logs) {
             _logs.push({
@@ -100,6 +161,10 @@ export function buildLogsObject(logs: any[], blHash: string, blNumber: string, t
 }
 
 export function makeLogObject(rawActionDocument, log, forSubscription) {
+    let trx = rawActionDocument['@raw']['hash'];
+    if(!isHexPrefixed(trx)) {
+        trx = '0x' + trx;
+    }
     let baseLogObj = {
         address: toChecksumAddress('0x' + log.address),
         blockHash: '0x' + rawActionDocument['@raw']['block_hash'],
@@ -107,7 +172,7 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
         data: '0x' + log.data,
         logIndex: numToHex(log.logIndex),
         topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
-        transactionHash: rawActionDocument['@raw']['hash'],
+        transactionHash: trx,
         transactionIndex: numToHex(rawActionDocument['@raw']['trx_index'])
     }
 
@@ -117,6 +182,10 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
     return Object.assign(baseLogObj, {
         removed: false,
     });
+}
+
+export function reverseHex(hex: string) {
+    return hex.substring(6, 8) + hex.substring(4, 6) + hex.substring(2, 4) + hex.substring(0, 2);
 }
 
 export function logFilterMatch(log, addressFilter, topicsFilter) {
@@ -139,6 +208,22 @@ export function logFilterMatch(log, addressFilter, topicsFilter) {
     }
 
     return true;
+}
+
+export function addHexPrefix(str: string): string {
+    if (typeof str !== 'string') {
+        return str
+    }
+
+    return isHexPrefixed(str) ? str : '0x' + str
+}
+
+export function isHexPrefixed(str: string): boolean {
+    if (typeof str !== 'string') {
+        throw new Error(`[isHexPrefixed] input must be type 'string', received type ${typeof str}`)
+    }
+
+    return str[0] === '0' && str[1] === 'x'
 }
 
 export function leftPadZerosEvenBytes(value) {
@@ -164,12 +249,14 @@ export function removeZeroHexFromFilter(filter, trimLeftZeros=false) {
                 return f;
 
             let noPrefix = f.replace(/^0x/, '').toLowerCase();
-            return trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+            let val =  trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+            return val;
         })
     }
 
     let noPrefix = filter.replace(/^0x/, '').toLowerCase();
-    return trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+    let val = trimLeftZeros ? noPrefix.replace(/^(00)+/, '') : noPrefix;
+    return val;
 }
 
 export function hasTopics(topics: string[], topicsFilter: string[]) {
@@ -178,14 +265,14 @@ export function hasTopics(topics: string[], topicsFilter: string[]) {
     topicsFilter = topicsFilter.map(t => {
         return removeZeroHexFromFilter(t, true);
     })
-
-    for (const [index,filterTopic] of topicsFilter.entries()) {
+    for (const [index, filterTopic] of topicsFilter.entries()) {
         const topic = topics[index];
+        const isFilterArray = Array.isArray(filterTopic);
         if (filterTopic === null) {
             topicsFiltered.push(true);
         } else if (topic === filterTopic) {
             topicsFiltered.push(true);
-        } else if (topic !== '' && filterTopic.includes(topic)) {
+        } else if (isFilterArray && filterTopic.includes(topic)) {
             topicsFiltered.push(true);
         } else {
             topicsFiltered.push(false);
