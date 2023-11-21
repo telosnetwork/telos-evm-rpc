@@ -56,9 +56,10 @@ export default class TelosEVMRPC {
             timeout: 3000
         })
 
-        this.fastify.decorate('eosjsRpc', new JsonRpc(this.config.nodeos_read))
-        this.fastify.decorate('redis', await this.createRedisClient())
-        this.fastify.decorate('elastic', this.createElasticsearchClient())
+        this.fastify.decorate('eosjsRpc', new JsonRpc(this.config.nodeos_read));
+        this.fastify.decorate('redis', await this.createRedisClient());
+        this.fastify.decorate('elastic', this.createElasticsearchClient());
+        logger.info('All services reached')
         await this.addRoutes();
         const opts: FastifyListenOptions = {
             host: this.config.apiHost,
@@ -66,11 +67,11 @@ export default class TelosEVMRPC {
         }
 
         this.fastify.listen(opts, err => {
-            logger.info(`Starting teloscan-evm-rpc at ${opts.host}:${opts.port}`)
+            logger.info(`Starting teloscan-evm-rpc at ${opts.host}:${opts.port}`);
 
             if (err) {
-                logger.error(`ERROR running teloscan-evm-rpc: ${JSON.stringify(err.message)}`)
-                throw err
+                logger.error(`ERROR running teloscan-evm-rpc: ${JSON.stringify(err.message)}`);
+                throw err;
             }
         })
     }
@@ -115,7 +116,6 @@ export default class TelosEVMRPC {
                 password: this.config.elasticPass
             }
         }
-
         return new Client(clientOpts);
     }
 
