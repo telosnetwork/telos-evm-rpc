@@ -13,7 +13,7 @@ import {
 	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed
 } from "../../util/utils"
-import DebugLogger from "../../debugLogging";
+import MyLogger from "../../logging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
 import moment from "moment";
 import {Api} from 'eosjs';
@@ -206,7 +206,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	const GENESIS_BLOCK = GENESIS_BLOCKS[CHAIN_ID_HEX];
 	const GENESIS_BLOCK_HASH = GENESIS_BLOCK.hash;
 
-	let Logger = new DebugLogger(opts.debug);
+	let Logger = new MyLogger(opts.debug);
 
 	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm, fastify, makeTrxVars);
 	nonceRetryManager.start();
@@ -305,8 +305,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return {v,r,s};
 	}
 
-	async function searchActionByHash(trxHash: string): Promise<any> {
-		Logger.log(`searching action by hash: ${trxHash}`)
+	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
+		Logger.debug(`searching action by hash: ${trxHash}`)
 		try {
 			let _hash = trxHash.toLowerCase();
 			if (isHexPrefixed(_hash)) {
@@ -321,10 +321,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			});
-			//Logger.log(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
+			//Logger.debug(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
 			return results?.hits?.hits[0]?._source;
 		} catch (e) {
-			console.log(e);
+			Logger.error(client.ip + ' ' + JSON.stringify(e));
 			return null;
 		}
 	}
@@ -349,7 +349,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			});
 			return results?.body?.hits?.hits[0]?._source;
 		} catch (e) {
-			console.log(e);
+			Logger.error(e);
 			return null;
 		}
 	}
@@ -396,7 +396,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			return await emptyBlockFromDelta(blockDelta);
 		} catch (e) {
-			console.log(e);
+			Logger.error(e);
 			return null;
 		}
 	}
@@ -419,13 +419,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			return await emptyBlockFromDelta(blockDelta);
 		} catch (e) {
-			console.log(e);
+			Logger.error(e);
 			return null;
 		}
 	}
 
 
-	async function reconstructBlockFromReceipts(receipts: any[], full: boolean) {
+	async function reconstructBlockFromReceipts(receipts: any[], full: boolean, client: any) {
 		try {
 			let blockHash;
 			let blockHex: string;
@@ -433,7 +433,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 			const trxs = [];
-			//Logger.log(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
+			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
@@ -502,7 +502,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
 		} catch (e) {
-			console.log(e);
+			Logger.error(client.ip + JSON.stringify(e));
 			return null;
 		}
 	}
@@ -700,9 +700,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 	}
 
-	async function getTracesForTrx(trxHash, adHoc) {
+	async function getTracesForTrx(trxHash, adHoc, client) {
 		if (trxHash) {
-			const receiptAction = await searchActionByHash(trxHash);
+			const receiptAction = await searchActionByHash(trxHash, client);
 			if (!receiptAction) return null;
 			const receipt = receiptAction['@raw'];
 
@@ -871,7 +871,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 
 			let toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
-			Logger.log(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
+			Logger.debug(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
 			//let toReturn = `0x${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			return removeLeftZeros(toReturn);
 		} catch (e) {
@@ -1135,7 +1135,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns the receipt of a transaction by transaction hash.
 	 */
-	methods.set('eth_getTransactionReceipt', async ([trxHash]) => {
+	methods.set('eth_getTransactionReceipt', async ([trxHash, client]) => {
 		if (trxHash) {
 
 			// lookup receipt delta
@@ -1144,11 +1144,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			//const receipt = receiptDelta['@receipt'];
 
 			// lookup receipt action
-			const receiptAction = await searchActionByHash(trxHash);
+			const receiptAction = await searchActionByHash(trxHash, client);
 			if (!receiptAction) return null;
 			const receipt = receiptAction['@raw'];
 
-			//Logger.log(`get transaction receipt got ${JSON.stringify(receipt)}`)
+			//Logger.debug(`get transaction receipt got ${JSON.stringify(receipt)}`)
 			const _blockHash = addHexPrefix(receipt['block_hash']);
 			const _blockNum = numToHex(receipt['block']);
 			const _gas = numToHex(receipt['gasused']);
@@ -1191,9 +1191,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns information about a transaction for a given hash.
 	 */
-	methods.set('eth_getTransactionByHash', async ([trxHash]) => {
+	methods.set('eth_getTransactionByHash', async ([trxHash, client]) => {
 		// lookup raw action
-		const receiptAction = await searchActionByHash(trxHash);
+		const receiptAction = await searchActionByHash(trxHash, client);
 		if (!receiptAction) return null;
 		const {v, r, s} = await getVRS(receiptAction);
 		const receipt = receiptAction['@raw'];
@@ -1225,7 +1225,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns information about a block by number.
 	 */
-	methods.set('eth_getBlockByNumber', async ([block, full]) => {
+	methods.set('eth_getBlockByNumber', async ([block, full, client]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
 		if (blockNumber === 0)
 			return GENESIS_BLOCK;
@@ -1235,13 +1235,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return emptyBlockFromDelta(blockDelta);
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
-		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full) : await emptyBlockFromNumber(blockNumber);
+		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromNumber(blockNumber);
 	});
 
 	/**
 	 * Returns information about a block by hash.
 	 */
-	methods.set('eth_getBlockByHash', async ([hash, full]) => {
+	methods.set('eth_getBlockByHash', async ([hash, full, client]) => {
 		let _hash = hash.toLowerCase();
 		if (_hash === GENESIS_BLOCK_HASH)
 			return GENESIS_BLOCK;
@@ -1250,7 +1250,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full) : await emptyBlockFromHash(_hash);
+		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
 	});
 
 	/**
@@ -1293,9 +1293,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns an array of all logs matching a given filter object.
 	 */
-	methods.set('eth_getLogs', async ([parameters]) => {
+	methods.set('eth_getLogs', async ([parameters, client]) => {
 		let params = await parameters; // Since we are using async/await, the parameters are actually a Promise
-		//console.log(params);
+		//Logger.debug(params);
 
 		const queryBody: any = {
 			bool: {
@@ -1336,11 +1336,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
              */
 			const rangeObj = { range: { "@raw.block": {} } };
 			if (fromBlock) {
-				// console.log(`getLogs using fromBlock: ${fromBlock}`);
+				// Logger.debug(`getLogs using fromBlock: ${fromBlock}`);
 				rangeObj.range["@raw.block"]['gte'] = fromBlock;
 			}
 			if (toBlock) {
-				// console.log(`getLogs using toBlock: ${toBlock}`);
+				// Logger.debug(`getLogs using toBlock: ${toBlock}`);
 				rangeObj.range["@raw.block"]['lte'] = toBlock;
 			}
 			queryBody.bool.must.push(rangeObj);
@@ -1371,21 +1371,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (isHexPrefixed(addressFilter)) {
 					addressFilter = addressFilter.slice(2);
 				}
-				//console.log(`getLogs using address: ${addressFilter}`);
+				//Logger.debug(`getLogs using address: ${addressFilter}`);
 				queryBody.bool.must.push({term: {"@raw.logs.address": addressFilter}})
 			}
 		}
 
 		if (topicsFilter && topicsFilter.length > 0) {
 			let flatTopics = [];
-			//console.log(`getLogs using raw topics:\n${topicsFilter}`);
+			//Logger.debug(`getLogs using raw topics:\n${topicsFilter}`);
 			topicsFilter.forEach((topic, index) => {
 				if (!topic)
 					return;
 
-				//console.log(`topic: ${topic}`);
+				//console.debug(`topic: ${topic}`);
 				let trimmed = removeZeroHexFromFilter(topic, false);
-				//console.log(`topic trimmed: ${trimmed}`);
+				//console.debug(`topic trimmed: ${trimmed}`);
 
 				if (Array.isArray(trimmed)) {
 					// Todo: make or query by index
@@ -1394,7 +1394,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					flatTopics.push(trimmed);
 				}
 			})
-			//console.log(`getLogs using topics:\n${topicsFilter}`);
+			//Logger.debug(`getLogs using topics:\n${topicsFilter}`);
 			queryBody.bool.must.push({
 				terms: {
 					"@raw.logs.topics": flatTopics,
@@ -1424,12 +1424,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 						if (!blockHash) {
 							if (fromBlock > block || toBlock < block) {
-								// console.log('filter out by from/to block');
+								// Logger.debug('filter out by from/to block');
 								continue;
 							}
 						} else {
 							if (blockHash !== doc['@raw']['block_hash']) {
-								// console.log('filter out by blockHash');
+								// Logger.debug('filter out by blockHash');
 								continue;
 							}
 						}
@@ -1444,7 +1444,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			return results;
 		} catch (e) {
-			console.log(`ERROR while filtering log query result: ${e.message}`);
+			Logger.error(`${client.ip} - ERROR while filtering log query result: ${e.message}`);
 			return [];
 		}
 	});
@@ -1456,12 +1456,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 *
 	 * Check the eth_getlogs function above for help
 	 */
-	methods.set('trace_filter', async ([parameters]) => {
+	methods.set('trace_filter', async ([parameters, client]) => {
 		let params = await parameters;
 		// query preparation
 		const results = [];
 		for (const param_obj of params) {
-			// console.log(param_obj);
+			// Logger.debug(param_obj);
 			let fromAddress = param_obj.fromAddress;
 			let toAddress = param_obj.toAddress;
 			let fromBlock: string | number = parseInt(await toBlockNumber(param_obj.fromBlock), 16);
@@ -1487,24 +1487,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (fromBlock || toBlock) {
 				const rangeObj = { range: { "@raw.block": {} } };
 				if (fromBlock) {
-					// console.log(`getLogs using toBlock: ${toBlock}`);
+					// Logger.debug(`getLogs using toBlock: ${toBlock}`);
 					rangeObj.range["@raw.block"]['gte'] = fromBlock;
 				}
 				if (toBlock) {
-					// console.log(`getLogs using fromBlock: ${params.fromBlock}`);
+					// Logger.debug(`getLogs using fromBlock: ${params.fromBlock}`);
 					rangeObj.range["@raw.block"]['lte'] = toBlock;
 				}
 				queryBody.bool.must.push(rangeObj);
 			}
 
 			if (fromAddress) {
-				// console.log(fromAddress);
+				// Logger.debug(fromAddress);
 				const matchFrom = { terms: { "@raw.itxs.from": {} } };
 				matchFrom.terms["@raw.itxs.from"] = fromAddress;
 				queryBody.bool.must.push(matchFrom);
 			}
 			if (toAddress) {
-				// console.log(toAddress);
+				// Logger.debug(toAddress);
 				const matchTo = { terms: { "@raw.itxs.to": {} } };
 				matchTo.terms["@raw.itxs.to"] = toAddress;
 				queryBody.bool.must.push(matchTo);
@@ -1552,7 +1552,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			} catch (e) {
-				console.log(JSON.stringify(e, null, 2));
+				Logger.error(client.ip + ' - ' + JSON.stringify(e, null, 2));
 				return [];
 			}
 		}
@@ -1564,8 +1564,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * https://openethereum.github.io/JSONRPC-trace-module#trace_transaction
 	 * curl --data '{"method":"trace_transaction","params":["0x17104ac9d3312d8c136b7f44d4b8b47852618065ebfa534bd2d3b5ef218ca1f3"],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST localhost:7000/evm
 	 */
-	methods.set('trace_transaction', async ([trxHash]) => {
-		return await getTracesForTrx(trxHash, false);
+	methods.set('trace_transaction', async ([trxHash, client]) => {
+		return await getTracesForTrx(trxHash, false, client);
 	});
 
 	/*
@@ -1590,11 +1590,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
        }
 
      */
-	methods.set('trace_replayTransaction', async ([trxHash, traceTypes]) => {
+	methods.set('trace_replayTransaction', async ([trxHash, traceTypes, client]) => {
 		if (traceTypes.length !== 1 || traceTypes[0] !== 'trace')
 			throw new Error("trace_replayTransaction only supports the \"trace\" type of trace (not vmTrace or stateDiff");
 
-		return getTracesForTrx(trxHash, true);
+		return getTracesForTrx(trxHash, true, client);
 	});
 
 	/*
@@ -1693,13 +1693,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function doRpcMethod(jsonRpcRequest: any, clientInfo, reply: any) {
 		let { jsonrpc, id, method, params } = jsonRpcRequest;
 		let { usage, limit, origin, ip } = clientInfo;
+		params.push(clientInfo);
 
 		// if jsonrpc not set, assume 2.0 as there are some clients which leave it out
 		if (!jsonrpc)
 			jsonrpc = "2.0"
 
 		if (jsonrpc !== "2.0") {
-			Logger.log(`Got invalid jsonrpc, request.body was: ${JSON.stringify(jsonRpcRequest, null, 4)}`);
+			Logger.error(`REQERROR: ${new Date().toISOString()} - ${ip} - Got invalid jsonrpc, request.body was: ${JSON.stringify(jsonRpcRequest, null, 4)}`);
 			return jsonRPC2Error(reply, "InvalidRequest", id, "Invalid JSON RPC");
 		}
 		if (methods.has(method)) {
@@ -1709,7 +1710,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const result = await func(params);
 
 				const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
-				console.log(`RPCREQUEST: ${new Date().toISOString()} - ${duration} μs - ${ip} (${isNaN(usage) ? 0 : usage}/${isNaN(limit) ? 0 : limit}) - ${origin} - ${method}`);
+				Logger.log(`RPCREQUEST: ${new Date().toISOString()} - ${duration} μs - ${ip} (${isNaN(usage) ? 0 : usage}/${isNaN(limit) ? 0 : limit}) - ${origin} - ${method}`);
 				Logger.log(`REQ: ${JSON.stringify(params)} | RESP: ${typeof result == 'object' ? JSON.stringify(result, null, 2) : result}`);
 				return { jsonrpc, id, result };
 			} catch (e) {
@@ -1718,7 +1719,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					let message = e.errorMessage?.replace(/\0.*$/g,'');;
 					let data = e.data;
 					let error = { code, data, message };
-					console.log(`RPCREVERT: ${new Date().toISOString()} - | Method: ${method} | VM execution error, reverted with message: ${e.errorMessage} \n\n REQ: ${JSON.stringify(params)}\n\n ERROR RESP: ${JSON.stringify(error)}`);
+					Logger.error(`RPCREVERT: ${new Date().toISOString()} - ${ip} | Method: ${method} | VM execution error, reverted with message: ${e.errorMessage} \n\n REQ: ${JSON.stringify(params)}\n\n ERROR RESP: ${JSON.stringify(error)}`);
 					return { jsonrpc, id, error };
 				}
 
@@ -1734,11 +1735,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					error.message = e?.message;
 				}
 
-				console.log(`RPCERROR: ${new Date().toISOString()} - ${JSON.stringify({error, exception: e})} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
+				Logger.error(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify({error, exception: e})} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
 				return { jsonrpc, id, error };
 			}
 		} else {
-			console.log(`METHODNOTFOUND: ${new Date().toISOString()} - ${method}`);
+			Logger.error(`METHODNOTFOUND: ${new Date().toISOString()} - ${ip} - ${method}`);
 			return jsonRPC2Error(reply, 'MethodNotFound', id, `Invalid method: ${method}`);
 		}
 	}
@@ -1759,7 +1760,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let responses = await Promise.all(promises);
 
 			const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
-			console.log(`RPCREQUESTBATCH: ${new Date().toISOString()} - ${duration} μs - ${ip} (${usage}/${limit}) - ${origin} - BATCH OF ${responses.length}`);
+			Logger.log(`RPCREQUESTBATCH: ${new Date().toISOString()} - ${duration} μs - ${ip} (${usage}/${limit}) - ${origin} - BATCH OF ${responses.length}`);
 			return responses;
 		} else {
 			return await doRpcMethod(payload, clientInfo, reply);
@@ -1781,7 +1782,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	fastify.post('/evm', { schema }, async (request: FastifyRequest, reply: FastifyReply) => {
 		let origin;
-		//console.log(request.headers);
+		//Logger.debug(request.headers);
 		if (request.headers['origin'] === METAMASK_EXTENSION_ORIGIN) {
 			origin = 'MetaMask';
 		} else {
