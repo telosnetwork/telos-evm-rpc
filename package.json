@@ -43,7 +43,6 @@
     "pino-pretty": "^10.0.0",
     "reconnecting-websocket": "^4.4.0",
     "redis": "^4.6.6",
-    "semver": "^7.5.4",
     "uWebSockets.js": "https://github.com/uNetworking/uWebSockets.js.git#v20.14.0",
     "ws": "^8.3.0"
   },
