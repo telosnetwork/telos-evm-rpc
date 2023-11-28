@@ -160,6 +160,73 @@ export function buildLogsObject(logs: any[], blHash: string, blNumber: string, t
     return _logs;
 }
 
+export function parseRevertReason(revertOutput) {
+    if (!revertOutput || revertOutput.length < 138) {
+        return '';
+    }
+
+    let reason = '';
+    let trimmedOutput = revertOutput.substr(138);
+    for (let i = 0; i < trimmedOutput.length; i += 2) {
+        reason += String.fromCharCode(parseInt(trimmedOutput.substr(i, 2), 16));
+    }
+    return reason;
+}
+
+export function parsePanicReason(revertOutput) {
+    let trimmedOutput = revertOutput.slice(-2)
+    let reason;
+
+    switch (trimmedOutput) {
+        case "01":
+            reason = "If you call assert with an argument that evaluates to false.";
+            break;
+        case "11":
+            reason = "If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.";
+            break;
+        case "12":
+            reason = "If you divide or modulo by zero (e.g. 5 / 0 or 23 % 0).";
+            break;
+        case "21":
+            reason = "If you convert a value that is too big or negative into an enum type.";
+            break;
+        case "31":
+            reason = "If you call .pop() on an empty array.";
+            break;
+        case "32":
+            reason = "If you access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. x[i] where i >= x.length or i < 0).";
+            break;
+        case "41":
+            reason = "If you allocate too much memory or create an array that is too large.";
+            break;
+        case "51":
+            reason = "If you call a zero-initialized variable of internal function type.";
+            break;
+        default:
+            reason = "Default panic message";
+    }
+    return reason;
+}
+
+export function toOpname(opcode) {
+    switch (opcode) {
+        case "f0":
+            return "create";
+        case "f1":
+            return "call";
+        case "f4":
+            return "delegatecall";
+        case "f5":
+            return "create2";
+        case "fa":
+            return "staticcall";
+        case "ff":
+            return "selfdestruct";
+        default:
+            return "unkown";
+    }
+}
+
 export function makeLogObject(rawActionDocument, log, forSubscription) {
     let trx = rawActionDocument['@raw']['hash'];
     if(!isHexPrefixed(trx)) {
