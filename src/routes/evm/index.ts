@@ -11,7 +11,9 @@ import {
 	BLOCK_TEMPLATE,
 	GENESIS_BLOCKS,
 	BLOCK_GAS_LIMIT,
-	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed
+	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed,
+	parsePanicReason, parseRevertReason, toOpname
+
 } from "../../util/utils"
 import MyLogger from "../../logging";
 import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
@@ -65,73 +67,6 @@ class Refund extends Struct {
 			type: Checksum160,
 		}
 	]
-}
-
-function parseRevertReason(revertOutput) {
-	if (!revertOutput || revertOutput.length < 138) {
-		return '';
-	}
-
-	let reason = '';
-	let trimmedOutput = revertOutput.substr(138);
-	for (let i = 0; i < trimmedOutput.length; i += 2) {
-		reason += String.fromCharCode(parseInt(trimmedOutput.substr(i, 2), 16));
-	}
-	return reason;
-}
-
-function parsePanicReason(revertOutput) {
-	let trimmedOutput = revertOutput.slice(-2)
-	let reason;
-
-	switch (trimmedOutput) {
-		case "01":
-			reason = "If you call assert with an argument that evaluates to false.";
-			break;
-		case "11":
-			reason = "If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.";
-			break;
-		case "12":
-			reason = "If you divide or modulo by zero (e.g. 5 / 0 or 23 % 0).";
-			break;
-		case "21":
-			reason = "If you convert a value that is too big or negative into an enum type.";
-			break;
-		case "31":
-			reason = "If you call .pop() on an empty array.";
-			break;
-		case "32":
-			reason = "If you access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. x[i] where i >= x.length or i < 0).";
-			break;
-		case "41":
-			reason = "If you allocate too much memory or create an array that is too large.";
-			break;
-		case "51":
-			reason = "If you call a zero-initialized variable of internal function type.";
-			break;
-		default:
-			reason = "Default panic message";
-	}
-	return reason;
-}
-
-function toOpname(opcode) {
-	switch (opcode) {
-		case "f0":
-			return "create";
-		case "f1":
-			return "call";
-		case "f4":
-			return "delegatecall";
-		case "f5":
-			return "create2";
-		case "fa":
-			return "staticcall";
-		case "ff":
-			return "selfdestruct";
-		default:
-			return "unkown";
-	}
 }
 
 function jsonRPC2Error(reply: FastifyReply, type: string, requestId: string, message: string, code?: number) {
@@ -647,7 +582,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			type: itx.type
 		}
 
-		if(itx.init)
+		if(itx.init?.length > 0)
 			trace.action.init = addHexPrefix(itx.init);
 
 		if(itx.address)
@@ -677,15 +612,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	function makeTraces(receipt, adHoc) {
 
 		receipt['itxs'] = receipt['itxs'].filter(item => item.traceAddress.length > 0);
-
 		const results = [
 			makeInitialTrace(receipt, adHoc)
 		];
 		for (const itx of receipt['itxs']) {
-			// Internal transactions should have a trace address, they aren't the initial trace
-			if(itx.traceAddress.length === 0)
-				continue;
-
 			results.push(makeTrace(receipt, itx, adHoc));
 		}
 
@@ -695,7 +625,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return {
 			"output": addHexPrefix(receipt.output),
 			"stateDiff": null,
-			trace: results,
+			"trace": results,
 			"vmTrace": null
 		}
 	}
@@ -1039,7 +969,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					} else {
 						err.errorMessage = 'VM Exception while processing transaction: reverted without a reason string';
 					}
-
 					throw err;
 				}
 
