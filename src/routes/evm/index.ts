@@ -1640,7 +1640,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 				const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
 				Logger.log(`RPCREQUEST: ${new Date().toISOString()} - ${duration} μs - ${ip} (${isNaN(usage) ? 0 : usage}/${isNaN(limit) ? 0 : limit}) - ${origin} - ${method}`);
-				Logger.log(`REQ: ${JSON.stringify(params)} | RESP: ${typeof result == 'object' ? JSON.stringify(result, null, 2) : result}`);
+				Logger.debug(`REQ: ${JSON.stringify(params)} | RESP: ${typeof result == 'object' ? JSON.stringify(result, null, 2) : result}`);
 				return { jsonrpc, id, result };
 			} catch (e) {
 				if (e instanceof TransactionError) {
