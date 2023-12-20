@@ -748,7 +748,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getStorageAt', async ([address, position]) => {
 		return await fastify.evm.getStorageAt(address.toLowerCase(), position);
-		const value = await fastify.evm.telos.getStorageAt(address.toLowerCase(), position);
+		const value = await fastify.evm.getStorageAt(address.toLowerCase(), position);
 		return (value === '0x0') ? '0x0000000000000000000000000000000000000000000000000000000000000000' : value;
 	});
 
@@ -1032,10 +1032,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (assertionMessage && assertionMessage.includes('incorrect nonce')) {
 					return nonceRetryManager.submitFailedRawTrx(signedTx);
 				}
-			}
+            }
 
-			if (e instanceof TransactionError)
-				throw e;
+            if (e instanceof TransactionError)
+                throw e;
 
 			throw e;
 		}
