@@ -16,12 +16,8 @@ import {
 
 } from "../../util/utils"
 import MyLogger from "../../logging";
-import {AuthorityProvider, AuthorityProviderArgs} from 'eosjs/dist/eosjs-api-interfaces';
 import moment from "moment";
-import {Api} from 'eosjs';
 import {ethers, BigNumber} from 'ethers';
-import {JsSignatureProvider} from 'eosjs/dist/eosjs-jssig'
-import {TransactionVars} from '@telosnetwork/telosevm-js'
 import { addHexPrefix } from '@ethereumjs/util';
 import {
 	API,
@@ -32,9 +28,10 @@ import {
 	Transaction, Bytes, Checksum160
 } from '@wharfkit/antelope'
 import NonceRetryManager from "../../util/NonceRetryManager";
+import {TransactionVars} from "../../telosevm-js/telos";
 
 const BN = require('bn.js');
-const GAS_PRICE_OVERESTIMATE = 1.2
+const GAS_PRICE_OVERESTIMATE = 1.00
 
 const RECEIPT_LOG_START = "RCPT{{";
 const RECEIPT_LOG_END = "}}RCPT";
@@ -119,13 +116,10 @@ function jsonRPC2Error(reply: FastifyReply, type: string, requestId: string, mes
 	return errorResponse;
 }
 
-interface TransactionError extends Error {
-	errorMessage: string;
-	data: any;
-	code: number;
-}
-
 class TransactionError extends Error {
+	public errorMessage: string
+	public data: any
+	public code: number
 }
 
 export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
@@ -133,6 +127,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	const methods: Map<string, (params?: any) => Promise<any> | any> = new Map();
 	const decimalsBN = new BN('1000000000000000000');
 	const zeros = "0x0000000000000000000000000000000000000000";
+	const chainAddr = [
+		"0xb1f8e55c7f64d203c1400b9d8555d050f94adf39",
+		"0x9f510b19f1ad66f0dcf6e45559fab0d6752c1db7",
+		"0xb8e671734ce5c8d7dfbbea5574fa4cf39f7a54a4",
+		"0xb1d3fbb2f83aecd196f474c16ca5d9cffa0d0ffc",
+	];
+	const chainIds = [1, 3, 4, 42];
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
 
@@ -143,93 +144,59 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	let Logger = new MyLogger(opts.debug);
 
-	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm, fastify, makeTrxVars);
+	let nonceRetryManager = new NonceRetryManager(opts, fastify.evm, fastify, makeTrxVars, getInfo);
 	nonceRetryManager.start();
 
-	// Setup Api instance just for signing, to optimize eosjs so it doesn't call get_required_keys every time
-	// TODO: Maybe cache the ABI here if eosjs doesn't already
-	//   similar to https://raw.githubusercontent.com/JakubDziworski/Eos-Offline-Transaction-Example/master/src/tx-builder.ts
-	const privateKeys = [opts.signer_key]
-	const accountPublicKey = PrivateKey.from(opts.signer_key).toPublic().toString()
-	const signatureProvider = new JsSignatureProvider(privateKeys)
-	const authorityProvider: AuthorityProvider = {
-		getRequiredKeys: (args: AuthorityProviderArgs): Promise<string[]> => {
-			return Promise.resolve([accountPublicKey])
-		},
-	}
+	// 0 is healthy, 1 is lib lag, 2 is head lag
+	let healthStatus = 0
 
-	const getInfoResponse = await getInfo()
+	setInterval(async () => {
+		// health check
+		const getInfoResponse = await getInfo()
+		const libBehind = getInfoResponse.head_block_num.value.sub(getInfoResponse.last_irreversible_block_num.value).gt(new BN(opts.acceptableLibLag))
+		if (libBehind) {
+			healthStatus = 1
+			return
+		}
 
-	fastify.decorate('cachingApi', new Api({
-		rpc: fastify.eosjsRpc,
-		// abiProvider,
-		signatureProvider,
-		authorityProvider,
-		chainId: getInfoResponse.chain_id.toString(),
-		textDecoder: new TextDecoder(),
-		textEncoder: new TextEncoder(),
-	}))
+		const headDelta = Date.now() - getInfoResponse.head_block_time.toMilliseconds()
+		const headBehind = headDelta > opts.acceptableHeadLagMs
+		if (headBehind) {
+			healthStatus = 2
+			return
+		}
 
-	// AUX FUNCTIONS
+		healthStatus = 0
 
-	async function getInfo(): Promise<API.v1.GetInfoResponse> {
+	}, 1000)
+
+    // AUX FUNCTIONS
+
+    async function getInfo(): Promise<API.v1.GetInfoResponse> {
 		const key = `${CHAIN_ID_HEX}_get_info`
 		const cachedData = await fastify.redis.get(key)
-		if (cachedData) {
+        if (cachedData) {
 			return API.v1.GetInfoResponse.from(JSON.parse(cachedData));
-		} else {
-			//const apiResponse = await fastify.eosjs.rpc.get_info();
+        } else {
+            //const apiResponse = await fastify.eosjs.rpc.get_info();
 			const apiResponse: API.v1.GetInfoResponse = await fastify.readApi.v1.chain.get_info();
-			await fastify.redis.set(key, JSON.stringify(apiResponse), {
-				PX: 500,
+            await fastify.redis.set(key, JSON.stringify(apiResponse), {
+				PX: 1000,
 				NX: true
 			});
-			return apiResponse;
-		}
-	}
+            return apiResponse;
+        }
+    }
 
-	async function getBlock(numOrId) {
-		const key = `${CHAIN_ID_HEX}_get_block:${numOrId}`
-		const cachedData = await fastify.redis.get(key);
-		if (cachedData) {
-			return JSON.parse(cachedData);
-		} else {
-			const apiResponse = await fastify.eosjsRpc.get_block(numOrId);
-			if (apiResponse) {
-				await fastify.redis.set(key, JSON.stringify(apiResponse), {
-					PX: 5000
-				})
-			}
-			return apiResponse;
-		}
-	}
-
-	async function makeTrxVars(): Promise<TransactionVars> {
-		// TODO: parameterize this
-		const expiration = (moment())
-			.add(45, 'seconds')
-			.toDate()
-			.toString()
-
-		const getInfoResponse = await getInfo()
+    async function makeTrxVars(): Promise<TransactionVars> {
+        const getInfoResponse = await getInfo()
 		const header = getInfoResponse.getTransactionHeader(45);
 		return {
 			expiration: header.expiration.toString(),
 			ref_block_num: header.ref_block_num.toNumber(),
 			ref_block_prefix: header.ref_block_prefix.toNumber()
 		}
-
-		/*
-        const getBlockResponse = await getBlock(getInfoResponse.last_irreversible_block_num)
-		const prefix = parseInt(reverseHex(getInfoResponse.last_irreversible_block_id.toString().substring(16, 24)), 16);
-
-		return {
-            expiration,
-            ref_block_num: getInfoResponse.last_irreversible_block_num.toNumber() & 0xffff,
-            ref_block_prefix: prefix,
-        }
-		 */
-	}
+    }
 
 	async function getVRS(receiptDoc): Promise<any> {
 		let receipt = receiptDoc["@raw"];
@@ -290,7 +257,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 	*/
 
-	async function getDeltaDocFromNumber(blockNumber: number) {
+    async function getDeltaDocFromNumber(blockNumber: number) {
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
 			size: 1,
@@ -304,10 +271,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return blockDelta;
 	}
 
-	async function emptyBlockFromDelta(blockDelta: any) {
+    async function emptyBlockFromDelta(blockDelta: any) {
 		const blockNumberHex = addHexPrefix(blockDelta['@global'].block_num.toString(16));
 		const timestamp = new Date(blockDelta['@timestamp']).getTime() / 1000;
-		const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
+        const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
 
@@ -476,7 +443,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return cachedData;
 			}
 
-			const global = await fastify.eosjsRpc.get_table_rows({
+			const global = await fastify.readApi.v1.chain.get_table_rows({
 				code: "eosio",
 				scope: "eosio",
 				table: "global",
@@ -690,6 +657,22 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	})
 
 	/**
+	 * Returns syncing info
+	 */
+	methods.set('eth_syncing', async () => {
+		const syncingObj = {
+			startingBlock: 0,
+			currentBlock: parseInt(await getCurrentBlockNumber(true), 16),
+			highestBlock: parseInt(await getCurrentBlockNumber(false), 16)
+		}
+
+		if ((syncingObj.highestBlock - syncingObj.currentBlock) > opts.syncingThreshhold)
+			return syncingObj
+
+		return false
+	})
+
+	/**
 	 * Returns true if client is actively listening for network connections.
 	 */
 	methods.set('net_listening', () => true);
@@ -722,6 +705,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_accounts', () => []);
 
 	/**
+	 * Returns current irreversible block
+	 */
+	methods.set('telos_finality', async () => {
+		const getInfoResponse = await getInfo()
+		const finalBlock = getInfoResponse.last_irreversible_block_num.value.add(new BN(opts.blockNumberDelta)).toNumber()
+		const headBlock = getInfoResponse.head_block_num.value.toNumber()
+		return { finalBlock, headBlock }
+	})
+
+	/**
 	 * Returns a list of pending transactions
 	 */
 	methods.set('parity_pendingTransactions', () => []);
@@ -730,7 +723,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the number of transactions sent from an address.
 	 */
 	methods.set('eth_getTransactionCount', async ([address]) => {
-		return removeLeftZeros(await fastify.evm.telos.getNonce(address.toLowerCase()));
+		return removeLeftZeros(await fastify.evm.getNonce(address.toLowerCase()));
 	});
 
 	/**
@@ -739,7 +732,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getCode', async ([address]) => {
 		try {
-			const account = await fastify.evm.telos.getEthAccount(address.toLowerCase());
+			const account = await fastify.evm.getEthAccount(address.toLowerCase());
 			if (account.code && account.code.length > 0 && account.code !== "0x") {
 				return addHexPrefix(Buffer.from(account.code).toString("hex"));
 			} else {
@@ -754,7 +747,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the value from a storage position at a given address.
 	 */
 	methods.set('eth_getStorageAt', async ([address, position]) => {
-		const value = await fastify.evm.telos.getStorageAt(address.toLowerCase(), position);
+		return await fastify.evm.getStorageAt(address.toLowerCase(), position);
+		const value = await fastify.evm.getStorageAt(address.toLowerCase(), position);
 		return (value === '0x0') ? '0x0000000000000000000000000000000000000000000000000000000000000000' : value;
 	});
 
@@ -764,14 +758,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_estimateGas', async ([txParams, block]) => {
 		if (txParams.hasOwnProperty('value')) {
+			// If value is not 0 check there is an account first
+			if(txParams.value > 0){
+				const account = await fastify.evm.getEthAccount(txParams.from.toLowerCase());
+				if (!account) {
+					let err = new TransactionError('Insufficient funds');
+					err.errorMessage = 'insufficient funds for gas * price + value';
+					throw err;
+				}
+			}
 			txParams.value = BigNumber.from(txParams.value).toHexString().slice(2);
-		}
-
-		const account = await fastify.evm.telos.getEthAccount(txParams.from.toLowerCase());
-		if (!account) {
-			let err = new TransactionError('Insufficient funds');
-			err.errorMessage = 'insufficient funds for gas * price + value';
-			throw err;
 		}
 
 		const encodedTx = await fastify.evm.createEthTx({
@@ -782,12 +778,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		});
 
 		try {
-			const gas = await fastify.evm.telos.estimateGas({
+			const gas = await fastify.evm.estimateGas({
 				account: opts.signer_account,
-				ram_payer: fastify.evm.telos.telosContract,
+				ram_payer: fastify.evm.telosContract,
 				tx: encodedTx,
 				sender: txParams.from,
-			}, fastify.cachingApi, await makeTrxVars());
+				trxVars: await makeTrxVars(),
+				getInfoResponse: await getInfo()
+			});
 
 			if (gas.startsWith(REVERT_FUNCTION_SELECTOR) || gas.startsWith(REVERT_PANIC_SELECTOR)) {
 				handleGasEstimationError(gas);
@@ -802,12 +800,19 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			let toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			Logger.debug(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
-			//let toReturn = `0x${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			return removeLeftZeros(toReturn);
 		} catch (e) {
 			if(e.receipt){
 				handleGasEstimationError(e.receipt);
 			}
+            // These are changes from yeet_eosjs
+            /*
+			console.dir(e);
+			if (e?.receipt?.output !== undefined)
+				 handleGasEstimationError(e?.receipt?.output);
+			else
+				throw new Error(`Failure while estimating gas: ${e.message}`)
+             */
 		}
 	});
 
@@ -842,13 +847,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_gasPrice', async () => {
 		const key = `${CHAIN_ID_HEX}_gas_price`;
 		const cachedData = await fastify.redis.get(key);
-		if (cachedData) {
-			return cachedData;
-		} else {
-			let price = await fastify.evm.telos.getGasPrice();
-			let priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
-			const gasPrice = isNaN(priceInt) ? null : removeLeftZeros(Math.floor(priceInt).toString(16));
-			fastify.redis.set(key, gasPrice, {
+        if (cachedData) {
+            return cachedData;
+        } else {
+            let price = await fastify.evm.getGasPrice();
+            let priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
+            const gasPrice = isNaN(priceInt) ? null : removeLeftZeros(Math.floor(priceInt).toString(16));
+            fastify.redis.set(key, gasPrice, {
 				PX: 500
 			});
 			return gasPrice;
@@ -860,11 +865,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBalance', async ([address]) => {
 		try {
-			const account = await fastify.evm.telos.getEthAccount(address.toLowerCase());
+			const account = await fastify.evm.getEthAccount(address.toLowerCase());
 			if (!account) {
 				return "0x0";
 			}
-			const bal = account.balance as number;
+			const bal = account.balance;
 			return removeLeftZeros(bal.toString(16));
 		} catch (e) {
 			return "0x0";
@@ -877,7 +882,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBalanceHuman', async ([address]) => {
 		try {
-			const account = await fastify.evm.telos.getEthAccount(address.toLowerCase());
+			const account = await fastify.evm.getEthAccount(address.toLowerCase());
 			if (!account) {
 				return "0";
 			}
@@ -986,12 +991,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		try {
-			const rawResponse = await fastify.evm.telos.raw({
+			const rawResponse = await fastify.evm.raw({
 				account: opts.signer_account,
 				tx: signedTx,
-				ram_payer: fastify.evm.telos.telosContract,
-				api: fastify.cachingApi,
-				trxVars: await makeTrxVars()
+				ram_payer: fastify.evm.telosContract,
+				trxVars: await makeTrxVars(),
+				getInfoResponse: await getInfo()
 			});
 
 			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
@@ -1023,14 +1028,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return addHexPrefix(rawResponse.eth.transactionHash);
 		} catch (e) {
 			if (opts.orderNonces) {
-				const assertionMessage = e?.details[0]?.message
+                // The previous version with eosjs was:
+                // const assertionMessage = e?.details[0]?.message
+				const assertionMessage = e?.response?.json?.error?.details[0]?.message
 				if (assertionMessage && assertionMessage.includes('incorrect nonce')) {
 					return nonceRetryManager.submitFailedRawTrx(signedTx);
 				}
-			}
+            }
 
-			if (e instanceof TransactionError)
-				throw e;
+            if (e instanceof TransactionError)
+                throw e;
 
 			throw e;
 		}
@@ -1040,25 +1047,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Submits transaction for broadcast to the Ethereum network.
 	 */
 	methods.set('eth_sendTransaction', async ([txParams]) => {
-		let params = {
-			...txParams,
-			rawSign: true,
-			sender: txParams.from,
-		}
-		if(txParams.value){
-			params.value = new BN(Buffer.from(txParams.value.slice(2), "hex"))
-		}
-		const encodedTx = await fastify.evm.createEthTx(params);
-		try {
-			const rawData = await fastify.evm.telos.raw({
-				account: opts.signer_account,
-				ram_payer: fastify.evm.telos.telosContract,
-				tx: encodedTx
-			});
-			return addHexPrefix(rawData.eth.transactionHash);
-		} catch (e) {
-			return null;
-		}
+		throw new Error(`No private key available to sign transaction`)
 	});
 
 	/**
@@ -1636,6 +1625,27 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const tRef = process.hrtime.bigint();
 			const func = methods.get(method);
 			try {
+                /*
+				 // 1 = lib lag
+				 if (healthStatus === 1) {
+					 const code = 3
+					 const data = await getInfo()
+					 const message = `ERROR: Node fork detected`
+					 const error = { code, data, message }
+					 console.log(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify({error})} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
+					 return {jsonrpc, id, error};
+				 }
+
+				 // 2 = head lag
+				 if (healthStatus === 2) {
+					 const code = 3
+					 const data = await getInfo()
+					 const message = `ERROR: Node out of sync detected`
+					 const error = { code, data, message }
+					 console.log(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify({error})} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
+					 return {jsonrpc, id, error};
+				 }
+                 */
 				const result = await func(params);
 
 				const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);

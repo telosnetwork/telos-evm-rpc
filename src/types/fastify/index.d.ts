@@ -1,14 +1,13 @@
-import {JsonRpc} from "eosjs";
 import {APIClient, Name, PrivateKey} from "@wharfkit/antelope";
 import {RedisClientType} from "redis";
 import {Client} from "@elastic/elasticsearch";
+import {TelosEvmApi} from "../../telosevm-js/telos";
 
 declare module 'fastify' {
     export interface FastifyInstance {
-        evm: any;
+        evm: TelosEvmApi;
         rpcPayloadHandlerContainer: any;
         cachingApi: any;
-        eosjsRpc: JsonRpc;
         readApi: APIClient;
         rpcAccount: Name;
         rpcPermission: Name;
