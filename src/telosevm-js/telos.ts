@@ -20,17 +20,6 @@ const BN = require('bn.js')
 const RECEIPT_LOG_START = "RCPT{{";
 const RECEIPT_LOG_END = "}}RCPT";
 
-const mockEthAccount = (address: string) => {
-  return transformEthAccount({
-    address: address,
-    account: '', // Needs an account name we have signatures for
-    balance: new BN(0, 16)._strip(),
-    code: "0x",
-    nonce: 0,
-    index: 0,
-  })
-}
-
 const transformEthAccount = (account: Account) => {
   account.address = `0x${account.address}`
   account.balance = new BN(account.balance, 16)._strip()
