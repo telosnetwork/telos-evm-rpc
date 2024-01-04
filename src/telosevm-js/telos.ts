@@ -20,6 +20,17 @@ const BN = require('bn.js')
 const RECEIPT_LOG_START = "RCPT{{";
 const RECEIPT_LOG_END = "}}RCPT";
 
+const mockEthAccount = (address: string) => {
+  return transformEthAccount({
+    address: address,
+    account: '', // Needs an account name we have signatures for
+    balance: new BN(0, 16)._strip(),
+    code: "0x",
+    nonce: 0,
+    index: 0,
+  })
+}
+
 const transformEthAccount = (account: Account) => {
   account.address = `0x${account.address}`
   account.balance = new BN(account.balance, 16)._strip()
@@ -186,14 +197,16 @@ export class TelosEvmApi {
         signatures: [signature],
       })
 
-      const start = Date.now()
+      /* 
+      const start = Date.now();
       const result = await api.v1.chain.send_transaction2(signed, {
         return_failure_trace: true,
         retry_trx: true,
         retry_trx_num_blocks: this.retryTrxNumBlocks
       })
       console.log(`send_transaction2 took ${Date.now() - start}ms`)
-
+      */
+      const result = await api.v1.chain.send_transaction(signed);
       if (this.debug) {
         try {
           result.processed.action_traces.forEach((trace: any) => {
@@ -336,7 +349,8 @@ export class TelosEvmApi {
         throw new Error(`Error while estimating gas: ${e.message}`)
       }
       // TODO: there isn't always pending console output, so accessing message.match(/(0[xX][0-9a-fA-F]*)$/)[0] will fail, the real error message is somewhere else in the error, see example:
-      const message = error?.details[1]?.message
+      let message = error?.details[1]?.message
+      message = (message === 'pending console output: ') ? error?.details[0]?.message : message;
       return this.handleEstimateGasConsole(message)
     }
   }
@@ -353,6 +367,7 @@ export class TelosEvmApi {
   handleEstimateGasConsole(message): string {
     const result = message.match(/(0[xX][0-9a-fA-F]*)$/)
 
+    console.log(`In handleEstimateGasConsole, message is: ${message}`);
     let receiptLog = message.slice(
         message.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length,
         message.indexOf(RECEIPT_LOG_END)
@@ -512,7 +527,7 @@ export class TelosEvmApi {
     if (rows.length && rows[0].address === address) {
       return transformEthAccount(rows[0])
     } else {
-      return undefined
+      return undefined;
     }
   }
 

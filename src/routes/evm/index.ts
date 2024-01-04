@@ -758,14 +758,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_estimateGas', async ([txParams, block]) => {
 		if (txParams.hasOwnProperty('value')) {
+			// If value is not 0 check there is an account first
+			if(txParams.value > 0){
+				const account = await fastify.evm.getEthAccount(txParams.from.toLowerCase());
+				if (!account) {
+					let err = new TransactionError('Insufficient funds');
+					err.errorMessage = 'insufficient funds for gas * price + value';
+					throw err;
+				}
+			}
 			txParams.value = BigNumber.from(txParams.value).toHexString().slice(2);
-		}
-
-		const account = await fastify.evm.getEthAccount(txParams.from.toLowerCase());
-		if (!account) {
-			let err = new TransactionError('Insufficient funds');
-			err.errorMessage = 'insufficient funds for gas * price + value';
-			throw err;
 		}
 
 		const encodedTx = await fastify.evm.createEthTx({
