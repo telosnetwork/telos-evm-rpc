@@ -465,15 +465,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
 				size: 1,
-				sort: [{ "@global.block_num": { order: "desc" } }],
-				query: {
-					bool: {
-						must: [
-							{ term: { "table": "global" } },
-							{ term: { "code": "eosio" } },
-						]
-					}
-				}
+				sort: [{ "@global.block_num": { order: "desc" } }]
 			});
 			let currentBlockNumber = addHexPrefix((Number(results?.hits?.hits[0]?._source["@global"].block_num)).toString(16));
 			if (currentBlockNumber) {
