@@ -139,6 +139,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	const CHAIN_ID = opts.chainId.toString();
 	const CHAIN_ID_HEX = addHexPrefix(opts.chainId.toString(16));
+	const CACHE_PREFIX = opts.elasticIndexPrefix;
 	const GENESIS_BLOCK = GENESIS_BLOCKS[CHAIN_ID_HEX];
 	const GENESIS_BLOCK_HASH = GENESIS_BLOCK.hash;
 
@@ -173,7 +174,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     // AUX FUNCTIONS
 
     async function getInfo(): Promise<API.v1.GetInfoResponse> {
-		const key = `${CHAIN_ID_HEX}_get_info`
+		const key = `${CACHE_PREFIX}_get_info`
 		const cachedData = await fastify.redis.get(key)
         if (cachedData) {
 			return API.v1.GetInfoResponse.from(JSON.parse(cachedData));
@@ -436,7 +437,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
-			const key = `${CHAIN_ID_HEX}_last_onchain_block`;
+			const key = `${CACHE_PREFIX}_last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData) {
@@ -456,7 +457,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			const key = `${CHAIN_ID_HEX}_last_indexed_block`;
+			const key = `${CACHE_PREFIX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
 			if (cachedData)
@@ -837,7 +838,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the current gas price in wei.
 	 */
 	methods.set('eth_gasPrice', async () => {
-		const key = `${CHAIN_ID_HEX}_gas_price`;
+		const key = `${CACHE_PREFIX}_gas_price`;
 		const cachedData = await fastify.redis.get(key);
         if (cachedData) {
             return cachedData;
