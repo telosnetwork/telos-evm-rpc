@@ -224,7 +224,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			});
-			//Logger.debug(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
+			if(results?.hits?.hits?.length === 0){
+				Logger.debug(`searching action by hash: ${trxHash} got no results`)
+				return null;
+			}
+			// Logger.debug(`searching action by hash: ${trxHash} got result: \n${JSON.stringify(results?.hits)}`)
 			return results?.hits?.hits[0]?._source;
 		} catch (e) {
 			Logger.error(client.ip + ' ' + JSON.stringify(e));
@@ -460,8 +464,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const key = `${CACHE_PREFIX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
-			if (cachedData)
+			if (cachedData && cachedData !== "0xNaN"){
 				return cachedData;
+			}
 
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
@@ -740,7 +745,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the value from a storage position at a given address.
 	 */
 	methods.set('eth_getStorageAt', async ([address, position]) => {
-		return await fastify.evm.getStorageAt(address.toLowerCase(), position);
 		const value = await fastify.evm.getStorageAt(address.toLowerCase(), position);
 		return (value === '0x0') ? '0x0000000000000000000000000000000000000000000000000000000000000000' : value;
 	});
@@ -772,7 +776,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		try {
 			const gas = await fastify.evm.estimateGas({
-				account: opts.signer_account,
+				account: opts.signerAccount,
 				ram_payer: fastify.evm.telosContract,
 				tx: encodedTx,
 				sender: txParams.from,
@@ -985,7 +989,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		try {
 			const rawResponse = await fastify.evm.raw({
-				account: opts.signer_account,
+				account: opts.signerAccount,
 				tx: signedTx,
 				ram_payer: fastify.evm.telosContract,
 				trxVars: await makeTrxVars(),

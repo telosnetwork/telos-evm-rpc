@@ -7,11 +7,11 @@ export interface TelosEvmConfig {
     debug: boolean;
     apiHost: string;
     apiPort: number;
-    nodeos_read: string,
-    nodeos_write: string,
-    signer_account: string;
-    signer_permission: string;
-    signer_key: string;
+    nodeosRead: string,
+    nodeosWrite: string,
+    signerAccount: string;
+    signerPermission: string;
+    signerKey: string;
     retryTrxNumBlocks: number;
     contracts: {
         main: string;

@@ -71,8 +71,8 @@ export class TelosEvmApi {
   constructor({
     telosPrivateKey,
     signingPermission,
-    nodeos_read,
-    nodeos_write,
+    nodeosRead,
+    nodeosWrite,
     telosContract,
     evmChainId,
     antelopeChainId,
@@ -80,19 +80,19 @@ export class TelosEvmApi {
   }: {
     telosPrivateKey: string
     signingPermission?: string
-    nodeos_read: string
-    nodeos_write: string
+    nodeosRead: string
+    nodeosWrite: string
     telosContract: string
     evmChainId: any
     antelopeChainId: string
     retryTrxNumBlocks: number
   }) {
     this.readAPI = new APIClient({
-      provider: new FetchProvider(nodeos_read)
+      provider: new FetchProvider(nodeosRead)
     })
     this.signingPermission = signingPermission || 'active'
     this.writeAPI =  new APIClient({
-      provider: new FetchProvider(nodeos_write)
+      provider: new FetchProvider(nodeosWrite)
     })
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)

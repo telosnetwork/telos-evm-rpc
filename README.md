@@ -10,10 +10,11 @@ Required plugin config at config.json
   "debug": true,
   "apiHost": "127.0.0.1",
   "apiPort": 3000,
-  "nodeos_read": "http://127.0.0.1:28888",
-  "signer_account": "rpc.evm",
-  "signer_permission": "rpc",
-  "signer_key": "5...something",
+  "nodeosRead": "http://127.0.0.1:28888",
+  "nodeosWrite": "http://127.0.0.1:28888",
+  "signerAccount": "rpc.evm",
+  "signerPermission": "rpc",
+  "signerKey": "5...something",
   "contracts": {
     "main": "eosio.evm"
   },

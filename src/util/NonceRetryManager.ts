@@ -110,7 +110,7 @@ export default class NonceRetryManager {
         try {
             failedTx.lastRetry = Date.now();
             const rawResponse = await this.telosEvmJs.raw({
-                account: this.opts.signer_account,
+                account: this.opts.signerAccount,
                 tx: failedTx.rawTx,
                 ram_payer: this.telosEvmJs.telosContract,
                 trxVars: await this.makeTrxVars(),

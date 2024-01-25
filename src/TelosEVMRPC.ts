@@ -77,21 +77,21 @@ export default class TelosEVMRPC {
         this.fastify.decorate('evm', new TelosEvmApi({
             // TODO: maybe this should be nodeos_write?  Need to check where we use fastify.evm and what it should be,
             //  possibly split up what we do so we have more granular control of which node type we use for which type of calls
-            nodeos_read: this.config.nodeos_read,
-            nodeos_write: this.config.nodeos_write,
+            nodeosRead: this.config.nodeosRead,
+            nodeosWrite: this.config.nodeosWrite,
             evmChainId: this.config.chainId,
             antelopeChainId: this.config.antelopeChainId,
             telosContract: this.config.contracts.main,
-            telosPrivateKey: this.config.signer_key,
+            telosPrivateKey: this.config.signerKey,
             retryTrxNumBlocks: this.config.retryTrxNumBlocks,
-            signingPermission: this.config.signer_permission
+            signingPermission: this.config.signerPermission
         }));
         this.fastify.evm.setDebug(this.config.debug);
 
-        this.fastify.decorate('rpcAccount', Name.from(this.config.signer_account))
-        this.fastify.decorate('rpcPermission', Name.from(this.config.signer_permission))
-        this.fastify.decorate('rpcKey', PrivateKey.from(this.config.signer_key))
-        this.fastify.decorate('readApi', new APIClient({provider: new FetchProvider(this.config.nodeos_read)}))
+        this.fastify.decorate('rpcAccount', Name.from(this.config.signerAccount))
+        this.fastify.decorate('rpcPermission', Name.from(this.config.signerPermission))
+        this.fastify.decorate('rpcKey', PrivateKey.from(this.config.signerKey))
+        this.fastify.decorate('readApi', new APIClient({provider: new FetchProvider(this.config.nodeosRead)}))
 
         this.fastify.decorate('rpcPayloadHandlerContainer', {});
 
