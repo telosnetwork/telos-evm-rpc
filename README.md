@@ -31,7 +31,8 @@ Required plugin config at config.json
   "elasticUser": "elastic",
   "elasticPass": "secretstuff",
   "elasticIndexPrefix": "telos-testnet",
-  "elasticIndexVersion": "v1.5"
+  "elasticIndexVersion": "v1.5",
+  "antelopeChainId": "1eaa0824707c8c16bd25145493bf062aecddfeb56c736f6ba6397f3195f33c9f"
 }
 
 ```
