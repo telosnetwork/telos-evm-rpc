@@ -1617,6 +1617,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function doRpcMethod(jsonRpcRequest: any, clientInfo, reply: any) {
 		let { jsonrpc, id, method, params } = jsonRpcRequest;
 		let { usage, limit, origin, ip } = clientInfo;
+		if(!params || !Array.isArray(params)){
+			params = [];
+		}
 		params.push(clientInfo);
 
 		// if jsonrpc not set, assume 2.0 as there are some clients which leave it out
