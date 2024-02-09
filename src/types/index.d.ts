@@ -5,6 +5,7 @@ export interface TelosEvmConfig {
     blockNumberDelta: number;
     antelopeChainId: string;
     debug: boolean;
+    nodeName: string,
     apiHost: string;
     apiPort: number;
     nodeosRead: string,
