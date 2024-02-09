@@ -464,7 +464,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const key = `${CACHE_PREFIX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
-			if (cachedData && cachedData !== "0xNaN"){
+			if (cachedData && !cachedData.endsWith("NaN")){
 				return cachedData;
 			}
 
@@ -1142,8 +1142,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_getBlockByNumber', async ([block, full, client]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
+		
 		if (blockNumber === 0)
 			return GENESIS_BLOCK;
+		
 
 		const blockDelta = await getDeltaDocFromNumber(blockNumber);
 		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
@@ -1608,6 +1610,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function doRpcMethod(jsonRpcRequest: any, clientInfo, reply: any) {
 		let { jsonrpc, id, method, params } = jsonRpcRequest;
 		let { usage, limit, origin, ip } = clientInfo;
+		if(!params || !Array.isArray(params)){
+			params = [];
+		}
 		params.push(clientInfo);
 
 		// if jsonrpc not set, assume 2.0 as there are some clients which leave it out
