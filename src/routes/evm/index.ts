@@ -441,7 +441,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
-			Logger.debug("Getting last onchain block");
 			const key = `${CACHE_PREFIX}_last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
 
@@ -462,7 +461,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			return lastOnchainBlock;
 		} else {
-			Logger.debug("Getting last indexed block");
 			const key = `${CACHE_PREFIX}_last_indexed_block`;
 			const cachedData = await fastify.redis.get(key);
 
@@ -475,7 +473,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				size: 1,
 				sort: [{ "@global.block_num": { order: "desc" } }]
 			});
-			Logger.debug("Elasticsearch results: " + JSON.stringify(results));
 			let currentBlockNumber = addHexPrefix((Number(results?.hits?.hits[0]?._source["@global"].block_num)).toString(16));
 			if (currentBlockNumber) {
 				fastify.redis.set(key, currentBlockNumber, {
@@ -786,7 +783,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				trxVars: await makeTrxVars(),
 				getInfoResponse: await getInfo()
 			});
-			Logger.log("gas estimate: " + gas);
 
 			if (gas.startsWith(REVERT_FUNCTION_SELECTOR) || gas.startsWith(REVERT_PANIC_SELECTOR)) {
 				handleGasEstimationError(gas);
@@ -803,7 +799,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			Logger.debug(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
 			return removeLeftZeros(toReturn);
 		} catch (e) {
-			Logger.log("Error estimating gas: " + e);
 			if(e.receipt){
 				handleGasEstimationError(e.receipt);
 			}
@@ -1146,13 +1141,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a block by number.
 	 */
 	methods.set('eth_getBlockByNumber', async ([block, full, client]) => {
-		Logger.debug('Getting block by number: ' + block);
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
 		
 		if (blockNumber === 0)
 			return GENESIS_BLOCK;
 		
-		Logger.debug('Got block number: ' + blockNumber);
 
 		const blockDelta = await getDeltaDocFromNumber(blockNumber);
 		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
