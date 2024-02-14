@@ -29,6 +29,7 @@ import {
 } from '@wharfkit/antelope'
 import NonceRetryManager from "../../util/NonceRetryManager";
 import {TransactionVars} from "../../telosevm-js/telos";
+import {estypes} from "@elastic/elasticsearch";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -262,9 +263,46 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 	*/
 
+	// borrowed from translator
+
+	function indexToSuffixNum(index: string) {
+		const spltIndex = index.split('-');
+		const suffix = spltIndex[spltIndex.length - 1];
+		return parseInt(suffix);
+	}
+
+	// TODO: do caching of delta indices?
+	async function getOrderedDeltaIndices() {
+
+		const deltaIndices: estypes.CatIndicesResponse = await fastify.elastic.cat.indices({
+			index: `${opts.elasticIndexPrefix}-delta-*`,
+			format: 'json'
+		});
+		deltaIndices.sort((a, b) => {
+			const aNum = indexToSuffixNum(a.index);
+			const bNum = indexToSuffixNum(b.index);
+			if (aNum < bNum)
+				return -1;
+			if (aNum > bNum)
+				return 1;
+			return 0;
+		});
+
+		return deltaIndices;
+	}
+
+	function adjustBlockNum(num: number): number {
+		// convert to native block num and divide over index size 10 million
+		return Math.floor((num - opts.blockNumberDelta) / 1e7);
+	}
+
+	function indexSuffixForBlock(blockNumber: number): string {
+		const adjustedNum = adjustBlockNum(blockNumber);
+		return String(adjustedNum).padStart(8, '0');
+	}
+
     async function getDeltaDocFromNumber(blockNumber: number) {
-        const adjustedNum = Math.floor((blockNumber - opts.blockNumberDelta) / 1e7);
-        const indexSuffix = String(adjustedNum).padStart(8, '0');
+        const indexSuffix = indexSuffixForBlock(blockNumber);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
 			size: 1,
@@ -386,7 +424,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 			}
 
-			const block = await getBlockByNumber(blockNum);
+			const block = await getDeltaDocFromNumber(blockNum);
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
 			const extraData = addHexPrefix(block['@blockHash']);
@@ -427,20 +465,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return results?.hits?.hits;
 	}
 
-	async function getBlockByNumber(block_num: number) {
-		const results = await fastify.elastic.search({
-			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
-			size: 1,
-			query: {
-				match: {
-					'@global.block_num': block_num
-				}
-			}
-		});
-
-		return results?.hits?.hits[0]?._source;
-	}
-
 	async function getCurrentBlockNumber(indexed: boolean = false) {
 		if (!indexed) {
 			const key = `${CACHE_PREFIX}_last_onchain_block`;
@@ -470,12 +494,19 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return cachedData;
 			}
 
-			const results = await fastify.elastic.search({
-				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
-				size: 1,
-				sort: [{ "@global.block_num": { order: "desc" } }]
-			});
-			let currentBlockNumber = addHexPrefix((Number(results?.hits?.hits[0]?._source["@global"].block_num)).toString(16));
+			const indices = (await getOrderedDeltaIndices()).reverse();
+
+			let lastBlockNum: number;
+			for (const index of indices) {
+				const docsCount = parseInt(index['docs.count']);
+				if (docsCount > 0) {
+					const adjustedNum = indexToSuffixNum(index.index);
+					lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta;
+					break;
+				}
+			}
+
+			let currentBlockNumber = addHexPrefix((Number(lastBlockNum)).toString(16));
 			if (currentBlockNumber) {
 				fastify.redis.set(key, currentBlockNumber, {
 					PX: 500
