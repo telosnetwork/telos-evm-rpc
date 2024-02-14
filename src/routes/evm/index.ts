@@ -263,8 +263,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	*/
 
     async function getDeltaDocFromNumber(blockNumber: number) {
+        const adjustedNum = Math.floor((blockNumber - opts.blockNumberDelta) / 1e7);
+        const indexSuffix = String(adjustedNum).padStart(8, '0');
 		const results = await fastify.elastic.search({
-			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-*`,
+			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
 			size: 1,
 			query: {
 				bool: {
