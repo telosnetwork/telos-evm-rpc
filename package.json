@@ -4,7 +4,11 @@
   "description": "",
   "main": "main.ts",
   "scripts": {
-    "build": "tsc"
+    "bootstrap": "npm i",
+    "build": "npm run bootstrap && tsc",
+    "start": "node dist/main.js",
+    "clean-deps": "rm -rdf node_modules && npm cache clean --force",
+    "clean-build": "rm -rdf dist"
   },
   "engines": {
     "node": "^18"
