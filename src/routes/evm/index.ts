@@ -293,7 +293,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	function adjustBlockNum(num: number): number {
 		// convert to native block num and divide over index size 10 million
-		return Math.floor((num - opts.blockNumberDelta) / 1e7);
+		return Math.floor((num + opts.blockNumberDelta) / 1e7);
 	}
 
 	function indexSuffixForBlock(blockNumber: number): string {
