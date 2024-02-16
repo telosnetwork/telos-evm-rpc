@@ -1373,108 +1373,115 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 *
 	 * Check the eth_getlogs function above for help
 	 */
-	methods.set('trace_filter', async ([parameters, client]) => {
-		let params = await parameters;
-		// query preparation
-		const results = [];
-		for (const param_obj of params) {
-			// Logger.debug(param_obj);
-			let fromAddress = param_obj.fromAddress;
-			let toAddress = param_obj.toAddress;
-			let fromBlock: string | number = parseInt(await toBlockNumber(param_obj.fromBlock), 16);
-			let toBlock: string | number = parseInt(await toBlockNumber(param_obj.toBlock), 16);
-			let after:  number = param_obj.after; //TODO what is this?
-			let count: number = param_obj.count;
+    methods.set('trace_filter', async ([parameters, client]) => {
+        let params = await parameters;
+        const run = async function(paramObject){
+            const results = [];
+            let fromAddress = paramObject.fromAddress;
+            let toAddress = paramObject.toAddress;
+            let fromBlock: string | number = parseInt(await toBlockNumber(paramObject.fromBlock), 16);
+            let toBlock: string | number = parseInt(await toBlockNumber(paramObject.toBlock), 16);
+            let after:  number = paramObject.after; //TODO what is this?
+            let count: number = paramObject.count;
 
-			if (typeof fromAddress !== 'undefined') {
-				fromAddress.forEach((addr, index) => fromAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
-			}
-			if (typeof toAddress !== 'undefined') {
-				toAddress.forEach((addr, index) => toAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
-			}
+            if (typeof fromAddress !== 'undefined') {
+                fromAddress.forEach((addr, index) => fromAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
+            }
+            if (typeof toAddress !== 'undefined') {
+                toAddress.forEach((addr, index) => toAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
+            }
 
-			const queryBody: any = {
-				bool: {
-					must: [
-						{ exists: { field: "@raw.itxs" } }
-					]
-				}
-			};
+            const queryBody: any = {
+                bool: {
+                    must: [
+                        { exists: { field: "@raw.itxs" } }
+                    ]
+                }
+            };
 
-			if (fromBlock || toBlock) {
-				const rangeObj = { range: { "@raw.block": {} } };
-				if (fromBlock) {
-					// Logger.debug(`getLogs using toBlock: ${toBlock}`);
-					rangeObj.range["@raw.block"]['gte'] = fromBlock;
-				}
-				if (toBlock) {
-					// Logger.debug(`getLogs using fromBlock: ${params.fromBlock}`);
-					rangeObj.range["@raw.block"]['lte'] = toBlock;
-				}
-				queryBody.bool.must.push(rangeObj);
-			}
+            if (fromBlock || toBlock) {
+                const rangeObj = { range: { "@raw.block": {} } };
+                if (fromBlock) {
+                    // Logger.debug(`getLogs using toBlock: ${toBlock}`);
+                    rangeObj.range["@raw.block"]['gte'] = fromBlock;
+                }
+                if (toBlock) {
+                    // Logger.debug(`getLogs using fromBlock: ${params.fromBlock}`);
+                    rangeObj.range["@raw.block"]['lte'] = toBlock;
+                }
+                queryBody.bool.must.push(rangeObj);
+            }
 
-			if (fromAddress) {
-				// Logger.debug(fromAddress);
-				const matchFrom = { terms: { "@raw.itxs.from": {} } };
-				matchFrom.terms["@raw.itxs.from"] = fromAddress;
-				queryBody.bool.must.push(matchFrom);
-			}
-			if (toAddress) {
-				// Logger.debug(toAddress);
-				const matchTo = { terms: { "@raw.itxs.to": {} } };
-				matchTo.terms["@raw.itxs.to"] = toAddress;
-				queryBody.bool.must.push(matchTo);
-			}
+            if (fromAddress) {
+                // Logger.debug(fromAddress);
+                const matchFrom = { terms: { "@raw.itxs.from": {} } };
+                matchFrom.terms["@raw.itxs.from"] = fromAddress;
+                queryBody.bool.must.push(matchFrom);
+            }
+            if (toAddress) {
+                // Logger.debug(toAddress);
+                const matchTo = { terms: { "@raw.itxs.to": {} } };
+                matchTo.terms["@raw.itxs.to"] = toAddress;
+                queryBody.bool.must.push(matchTo);
+            }
 
-			// search
-			try {
-				const searchResults = await fastify.elastic.search({
-					index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
-					size: count,
-					query: queryBody,
-					sort: [{ "@raw.trx_index": { order: "asc" } }]
-				});
+            // search
+            try {
+                const searchResults = await fastify.elastic.search({
+                    index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
+                    size: count,
+                    query: queryBody,
+                    sort: [{ "@raw.trx_index": { order: "asc" } }]
+                });
 
-				// processing
-				let logCount = 0;
-				for (const hit of searchResults.hits.hits) {
-					const doc = hit._source;
-					if (doc['@raw'] && doc['@raw']['itxs']) {
-						for (const itx of doc['@raw']['itxs']) {
-							results.push({
-								action: {
-									callType: toOpname(itx.callType),
-									//why is 0x not in the receipt table?
-									from: toChecksumAddress(itx.from),
-									gas: addHexPrefix(itx.gas),
-									input: addHexPrefix(itx.input),
-									to: toChecksumAddress(itx.to),
-									value: addHexPrefix(itx.value)
-								},
-								blockHash: addHexPrefix(doc['@raw']['block_hash']),
-								blockNumber: doc['@raw']['block'],
-								result: {
-									gasUsed: addHexPrefix(itx.gasUsed),
-									output: addHexPrefix(itx.output),
-								},
-								subtraces: itx.subtraces,
-								traceAddress: itx.traceAddress,
-								transactionHash: addHexPrefix(doc['@raw']['hash']),
-								transactionPosition: doc['@raw']['trx_index'],
-								type: itx.type
-							});
-							logCount++;
-						}
-					}
-				}
-			} catch (e) {
-				Logger.error(client.ip + ' - ' + JSON.stringify(e, null, 2));
-				return [];
-			}
-		}
-		return results;
-	});
+                // processing
+                let logCount = 0;
+                for (const hit of searchResults.hits.hits) {
+                    const doc = hit._source;
+                    if (doc['@raw'] && doc['@raw']['itxs']) {
+                        for (const itx of doc['@raw']['itxs']) {
+                            results.push({
+                                action: {
+                                    callType: toOpname(itx.callType),
+                                    //why is 0x not in the receipt table?
+                                    from: toChecksumAddress(itx.from),
+                                    gas: addHexPrefix(itx.gas),
+                                    input: addHexPrefix(itx.input),
+                                    to: toChecksumAddress(itx.to),
+                                    value: addHexPrefix(itx.value)
+                                },
+                                blockHash: addHexPrefix(doc['@raw']['block_hash']),
+                                blockNumber: doc['@raw']['block'],
+                                result: {
+                                    gasUsed: addHexPrefix(itx.gasUsed),
+                                    output: addHexPrefix(itx.output),
+                                },
+                                subtraces: itx.subtraces,
+                                traceAddress: itx.traceAddress,
+                                transactionHash: addHexPrefix(doc['@raw']['hash']),
+                                transactionPosition: doc['@raw']['trx_index'],
+                                type: itx.type
+                            });
+                            logCount++;
+                        }
+                    }
+                }
+            } catch (e) {
+                Logger.error(client.ip + ' - ' + JSON.stringify(e, null, 2));
+                return [];
+            }
+            return results;
+        }
+        if(Array.isArray(params)){
+            const results = [];
+            for (const param_obj of params) {
+                results.concat(run(param_obj));
+            }
+            return results;
+        } else {
+            return run(params);
+        }
+    });
 
 	/**
 	 * Returns the internal transaction trace filter matching the given filter object.
