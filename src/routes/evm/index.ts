@@ -1358,7 +1358,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
 				size: 2000,
 				query: queryBody,
-				sort: [{ "global_sequence": { order: "asc" } }]
+				sort: [{ "@raw.block": { order: "asc" }, "@raw.trx_index": {order: "asc"} }]
 			});
 
 			// processing
