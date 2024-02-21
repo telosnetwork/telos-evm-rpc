@@ -501,7 +501,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const docsCount = parseInt(index['docs.count']);
 				if (docsCount > 0) {
 					const adjustedNum = indexToSuffixNum(index.index);
-					lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta;
+					lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
 					break;
 				}
 			}
