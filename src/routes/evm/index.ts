@@ -800,6 +800,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			txParams.value = BigNumber.from(txParams.value).toHexString().slice(2);
 		}
 
+		if (txParams.input) {
+			txParams.data = txParams.input;
+			delete txParams.input;
+		}
+
 		const encodedTx = await fastify.evm.createEthTx({
 			...txParams,
 			sender: txParams.from,
@@ -933,6 +938,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let _value = ethers.BigNumber.from(0);
 		if (txParams.value) {
 			_value = ethers.BigNumber.from(txParams.value);
+		}
+		if (txParams.input) {
+			txParams.data = txParams.input;
+			delete txParams.input;
 		}
 		const obj = {
 			...txParams,
