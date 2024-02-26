@@ -983,6 +983,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		} catch (e) {
 			const error = e.response.json.error
 			if (error.code !== 3050003) {
+				if (error.code === 3090003) {
+					throw new Error("Unsatisfied authorization, node can't do eth_call with the current configuration")
+				}
 				throw new Error('This node does not have console printing enabled')
 			}
 			const message = error.details[1].message
