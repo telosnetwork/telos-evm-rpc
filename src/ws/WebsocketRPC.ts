@@ -170,6 +170,9 @@ export default class WebsocketRPC {
 
     handleIndexerMessage(data): void{
         const dataObj = JSON.parse(data);
+        if(dataObj.data?.stateRoot && dataObj.data?.stateRoot.startsWith('0x') === false){
+           dataObj.data.stateRoot = '0x' + dataObj.data.stateRoot;
+        }
         switch (dataObj.type) {
             case 'raw':
                 this.handleRawMessage(dataObj.data);
