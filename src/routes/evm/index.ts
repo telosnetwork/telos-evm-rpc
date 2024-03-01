@@ -1185,18 +1185,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	/**
 	 * Returns information about a transaction by block hash and index
 	 */
-	methods.set('eth_getTransactionByBlockHashAndIndex', async ([blockHash, full, trxIndex, client]) => {
+	methods.set('eth_getTransactionByBlockHashAndIndex', async ([blockHash, trxIndexHex, client]) => {
 		let _hash = blockHash.toLowerCase();
-		// if (_hash === GENESIS_BLOCK_HASH)
-		// 	return GENESIS_BLOCK;
 
 		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
-		console.log(">>>", block)
-		return block
+		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
+		const trxIndex = parseInt(trxIndexHex, 16);
+		return block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
 	});
 
 	/**
