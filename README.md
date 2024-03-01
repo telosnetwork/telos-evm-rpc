@@ -56,6 +56,7 @@ Methods:
   - eth_getStorageAt
   - eth_getTransactionCount
   - eth_getTransactionByHash
+  - eth_getTransactionByBlockHashAndIndex
   - eth_getTransactionReceipt
   - eth_getUncleCountByBlockNumber
   - eth_getUncleCountByBlockHash
