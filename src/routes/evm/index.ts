@@ -1194,7 +1194,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
 		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
 		const trxIndex = parseInt(trxIndexHex, 16);
-		return block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
+		let trx = block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
+		trx.result.type = "0x0";
+		trx.result.chainId = "0x29";
+		return trx;
 	});
 
 	/**
