@@ -1196,8 +1196,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const trxIndex = parseInt(trxIndexHex, 16);
 		let trx = block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
 		console.log(">>> trx: ", trx);
-		trx.result.type = "0x0";
-		trx.result.chainId = "0x29";
+		trx.type = "0x0";
+		trx.chainId = "0x29";
 		return trx;
 	});
 
