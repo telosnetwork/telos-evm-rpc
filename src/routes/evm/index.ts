@@ -499,8 +499,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				.reverse();
 
 			let lastBlockNum: number;
-			if (indices.length > 0) {
-				const index = indices[0]
+			const index = indices[0]
+			if (indices.length > 1) {
+				const docsCount = parseInt(index['docs.count']);
+				const adjustedNum = indexToSuffixNum(index.index);
+				lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
+			} else {
 				const results = await fastify.elastic.search({
 					index: `${index.index}`,
 					size: 1,
