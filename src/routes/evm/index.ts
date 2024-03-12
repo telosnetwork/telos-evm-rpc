@@ -202,7 +202,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function getVRS(receiptDoc): Promise<any> {
 		let receipt = receiptDoc["@raw"];
-		const v = removeLeftZeros(typeof receipt.v === 'string' ? receipt.v : receipt.v.toString(16), true);
+		const v = removeLeftZeros(BigInt(receipt.v).toString(16), true);
 		const r = removeLeftZeros(receipt.r, true);
 		const s = removeLeftZeros(receipt.s, true);
 
@@ -1180,6 +1180,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			v: removeLeftZeros(v),
 			r, s
 		};
+	});
+
+	/**
+	 * Returns information about a transaction by block hash and index
+	 */
+	methods.set('eth_getTransactionByBlockHashAndIndex', async ([blockHash, trxIndexHex, client]) => {
+		let _hash = blockHash.toLowerCase();
+
+		if (isHexPrefixed(_hash)) {
+			_hash = _hash.slice(2);
+		}
+		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
+		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
+		const trxIndex = parseInt(trxIndexHex, 16);
+		let trx = block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
+		trx.type = "0x0";
+		trx.chainId = CHAIN_ID_HEX;
+		return trx;
 	});
 
 	/**
