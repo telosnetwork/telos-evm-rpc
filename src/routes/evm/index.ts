@@ -494,16 +494,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return cachedData;
 			}
 
-			const indices = (await getOrderedDeltaIndices()).reverse();
+			const indices = (await getOrderedDeltaIndices())
+				.filter((index) => parseInt(index['docs.count'], 10) > 0)
+				.reverse();
 
 			let lastBlockNum: number;
-			for (const index of indices) {
+			const index = indices[0]
+			if (indices.length > 1) {
 				const docsCount = parseInt(index['docs.count']);
-				if (docsCount > 0) {
-					const adjustedNum = indexToSuffixNum(index.index);
-					lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
-					break;
-				}
+				const adjustedNum = indexToSuffixNum(index.index);
+				lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
+			} else {
+				const results = await fastify.elastic.search({
+					index: `${index.index}`,
+					size: 1,
+					sort: [{"@global.block_num": {order: "desc"}}]
+				});
+				lastBlockNum = results?.hits?.hits[0]?._source["@global"].block_num - opts.blockNumberDelta - 1;
+
 			}
 
 			let currentBlockNumber = addHexPrefix((Number(lastBlockNum)).toString(16));
