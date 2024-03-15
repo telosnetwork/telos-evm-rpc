@@ -302,7 +302,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
     async function getDeltaDocFromNumber(blockNumber: number, retry: number = 0) {
-        const indexSuffix = indexSuffixForBlock(blockNumber);
+        const indexSuffix = indexSuffixForBlock(blockNumber + opts.blockNumberDelta);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
 			size: 1,
@@ -329,7 +329,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getMultipleReceipts(blockNumbers: number[]) {
 		const blocksPerSuff = new Map<string, number[]>();
 		for (const blockNum of blockNumbers) {
-			const indexSuff = indexSuffixForBlock(blockNum);
+			const indexSuff = indexSuffixForBlock(blockNum + opts.blockNumberDelta);
 			const blocks = [blockNum];
 			if (blocksPerSuff.has(indexSuff))
 				blocksPerSuff.get(indexSuff).push(...blocks);
