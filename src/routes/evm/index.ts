@@ -200,7 +200,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
     }
 
-	async function getVRS(receiptDoc): Promise<any> {
+	function getVRS(receiptDoc): {v: string, r: string, s: string} {
 		let receipt = receiptDoc["@raw"];
 		const v = removeLeftZeros(BigInt(receipt.v).toString(16), true);
 		const r = removeLeftZeros(receipt.r, true);
@@ -316,7 +316,64 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return blockDelta;
 	}
 
-    async function emptyBlockFromDelta(blockDelta: any) {
+
+	async function getMultipleReceipts(blockNumbers: number[]) {
+		const blocksPerSuff = new Map<string, number[]>();
+		for (const blockNum of blockNumbers) {
+			const indexSuff = indexSuffixForBlock(blockNum);
+			const blocks = [blockNum];
+			if (blocksPerSuff.has(indexSuff))
+				blocksPerSuff.get(indexSuff).push(...blocks);
+			else
+				blocksPerSuff.set(indexSuff, blocks);
+		}
+		const receipts = [];
+		for (const [suffix, blocks] of blocksPerSuff.entries()) {
+			const results = await fastify.elastic.search({
+				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-${suffix}`,
+				size: 2000,
+				query: {
+					terms: {'@raw.block': blocks}
+				}
+			});
+			receipts.push(
+				...results.hits.hits.map(h => h._source));
+		}
+		return receipts;
+	}
+
+	async function getMultipleDeltaDocsFromNumbers(blockNumbers: number[]) {
+		const blocksPerSuff = new Map<string, number[]>();
+		for (const blockNum of blockNumbers) {
+			const indexSuff = indexSuffixForBlock(blockNum);
+			const blocks = [blockNum];
+			if (blocksPerSuff.has(indexSuff))
+				blocksPerSuff.get(indexSuff).push(...blocks);
+			else
+				blocksPerSuff.set(indexSuff, blocks);
+		}
+		const blocksWithReceipts = [];
+		const blocks = [];
+		for (const [suffix, blockNums] of blocksPerSuff.entries()) {
+			const searchBlock = await fastify.elastic.search({
+				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${suffix}`,
+				size: blockNums.length,
+				query: {
+					terms: {"@global.block_num": blockNums}
+				}
+			});
+			for (const hit of searchBlock.hits.hits) {
+				const doc: any = hit._source;
+				if (doc.txAmount > 0)
+					blocksWithReceipts.push(doc['@global'].block_num)
+				blocks.push(doc);
+			}
+		}
+		const receipts = await getMultipleReceipts(blocksWithReceipts);
+		return [blocks, receipts];
+	}
+
+    function emptyBlockFromDelta(blockDelta: any) {
 		const blockNumberHex = addHexPrefix(blockDelta['@global'].block_num.toString(16));
 		const timestamp = new Date(blockDelta['@timestamp']).getTime() / 1000;
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
@@ -341,7 +398,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (!blockDelta)
 				return null;
 
-			return await emptyBlockFromDelta(blockDelta);
+			return emptyBlockFromDelta(blockDelta);
 		} catch (e) {
 			Logger.error(e);
 			return null;
@@ -364,7 +421,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return null;
 			}
 
-			return await emptyBlockFromDelta(blockDelta);
+			return emptyBlockFromDelta(blockDelta);
 		} catch (e) {
 			Logger.error(e);
 			return null;
@@ -372,7 +429,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 
-	async function reconstructBlockFromReceipts(receipts: any[], full: boolean, client: any) {
+	function reconstructBlockFromReceipts(block, receipts: any[], full: boolean, client: any) {
 		try {
 			let blockHash;
 			let blockHex: string;
@@ -382,7 +439,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
-				const {v, r, s} = await getVRS(receiptDoc._source);
+				const {v, r, s} = getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
 
 				if (!blockHash) {
@@ -424,7 +481,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 			}
 
-			const block = await getDeltaDocFromNumber(blockNum);
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
 			const extraData = addHexPrefix(block['@blockHash']);
@@ -1163,7 +1219,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		// lookup raw action
 		const receiptAction = await searchActionByHash(trxHash, client);
 		if (!receiptAction) return null;
-		const {v, r, s} = await getVRS(receiptAction);
+		const {v, r, s} = getVRS(receiptAction);
 		const receipt = receiptAction['@raw'];
 
 		// lookup receipt delta
@@ -1200,7 +1256,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
+		let block;
+		if (receipts.length == 0)
+			block = await emptyBlockFromHash(_hash);
+
+		else {
+			const blockNum = receipts[0]['@raw'].block;
+			const delta = await getDeltaDocFromNumber(blockNum);
+			block = reconstructBlockFromReceipts(delta, receipts, true, client);
+		}
+
 		const trxIndex = parseInt(trxIndexHex, 16);
 		let trx = block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
 		trx.type = "0x0";
@@ -1223,7 +1288,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return emptyBlockFromDelta(blockDelta);
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
-		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromNumber(blockNumber);
+		return receipts.length > 0 ? reconstructBlockFromReceipts(blockDelta, receipts, full, client) : await emptyBlockFromNumber(blockNumber);
 	});
 
 	/**
@@ -1238,7 +1303,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
+		let block;
+		if (receipts.length == 0)
+			block = await emptyBlockFromHash(_hash);
+
+		else {
+			const blockNum = receipts[0]['@raw'].block;
+			const delta = await getDeltaDocFromNumber(blockNum);
+			block = reconstructBlockFromReceipts(delta, receipts, true, client);
+		}
+		return block;
 	});
 
 	/**
@@ -1771,12 +1845,51 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			const tRef = process.hrtime.bigint();
 
-			let promises = [];
+			const promises = [];
+			// gather all getBlockByNumber requests
+			const requestedBlockNums = [];
+			// used to order responses after async processing
+			const respMap = new Map<number, any>();
+
+			// generate promises for request resolution
 			for (let i = 0; i < payload.length; i++) {
-				let promise = doRpcMethod(payload[i], clientInfo, reply);
-				promises.push(promise);
+				let { jsonrpc, id, method, params } = payload[i];
+				if (method === 'eth_getBlockByNumber') {
+					// gather block request info for later
+					requestedBlockNums.push({params, index: i});
+				} else {
+					// normal request
+					promises.push(doRpcMethod(payload[i], clientInfo, reply).then(resp => respMap.set(i, resp)));
+				}
 			}
-			let responses = await Promise.all(promises);
+
+			if (requestedBlockNums.length > 0) {
+				// perform optimized batch get block by number request
+				promises.push(
+					getMultipleDeltaDocsFromNumbers(requestedBlockNums.map(req => req.params[0])).then(
+						blockData => {
+							const [blocks, allReceipts] = blockData;
+							for (const delta of blocks) {
+								const blockNum = delta['@global'].block_num;
+								const request = requestedBlockNums.find(req => req.params[0] == blockNum);
+								if (delta.txAmount == 0) {
+									respMap.set(request.index, emptyBlockFromDelta(delta));
+									continue;
+								}
+
+								const receipts = allReceipts.find(r => r["@raw"].block == blockNum);
+								respMap.set(request.index, reconstructBlockFromReceipts(delta, receipts, request.params[1], clientInfo));
+							}
+						}
+					));
+			}
+
+			await Promise.all(promises);
+
+			// gather results in same order user requested
+			const responses = []
+			for (let i = 0; i < respMap.size; i++)
+				responses.push(respMap.get(i));
 
 			const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
 			Logger.log(`RPCREQUESTBATCH: ${new Date().toISOString()} - ${duration} μs - ${ip} (${usage}/${limit}) - ${origin} - BATCH OF ${responses.length}`);
