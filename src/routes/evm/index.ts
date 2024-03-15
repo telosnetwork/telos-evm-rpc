@@ -316,8 +316,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return blockDelta;
 	}
 
-
-	async function getMultipleReceipts(blockNumbers: number[]) {
+	function getIndexSuffixesForBlocks(blockNumbers: number[]) {
 		const blocksPerSuff = new Map<string, number[]>();
 		for (const blockNum of blockNumbers) {
 			const indexSuff = indexSuffixForBlock(blockNum + opts.blockNumberDelta);
@@ -327,14 +326,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			else
 				blocksPerSuff.set(indexSuff, blocks);
 		}
+		return blocksPerSuff;
+	}
+
+	async function getMultipleReceipts(blockNumbers: number[]) {
 		const receipts = [];
-		for (const [suffix, blocks] of blocksPerSuff.entries()) {
+		for (const [suffix, blocks] of getIndexSuffixesForBlocks(blockNumbers).entries()) {
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-${suffix}`,
 				size: 2000,
 				query: {
 					terms: {'@raw.block': blocks}
 				}
+			}).catch(err => {
+				console.error(err);
+				throw err;
 			});
 			receipts.push(
 				...results.hits.hits.map(h => h._source));
@@ -343,33 +349,30 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	async function getMultipleDeltaDocsFromNumbers(blockNumbers: number[]) {
-		const blocksPerSuff = new Map<string, number[]>();
-		for (const blockNum of blockNumbers) {
-			const indexSuff = indexSuffixForBlock(blockNum);
-			const blocks = [blockNum];
-			if (blocksPerSuff.has(indexSuff))
-				blocksPerSuff.get(indexSuff).push(...blocks);
-			else
-				blocksPerSuff.set(indexSuff, blocks);
-		}
 		const blocksWithReceipts = [];
 		const blocks = [];
-		for (const [suffix, blockNums] of blocksPerSuff.entries()) {
+		for (const [suffix, blockNums] of getIndexSuffixesForBlocks(blockNumbers).entries()) {
 			const searchBlock = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${suffix}`,
 				size: blockNums.length,
 				query: {
 					terms: {"@global.block_num": blockNums}
 				}
+			}).catch(error => {
+				console.error(error);
+				throw error;
 			});
 			for (const hit of searchBlock.hits.hits) {
 				const doc: any = hit._source;
-				if (doc.txAmount > 0)
+				if (doc.txAmount)
 					blocksWithReceipts.push(doc['@global'].block_num)
 				blocks.push(doc);
 			}
 		}
-		const receipts = await getMultipleReceipts(blocksWithReceipts);
+		let receipts = [];
+		if (blocksWithReceipts.length > 0)
+			receipts = await getMultipleReceipts(blocksWithReceipts);
+
 		return [blocks, receipts];
 	}
 
@@ -1872,7 +1875,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 							for (const delta of blocks) {
 								const blockNum = delta['@global'].block_num;
 								const request = requestedBlockNums.find(req => req.params[0] == blockNum);
-								if (delta.txAmount == 0) {
+								if (!delta.txAmount) {
 									respMap.set(request.index, emptyBlockFromDelta(delta));
 									continue;
 								}
