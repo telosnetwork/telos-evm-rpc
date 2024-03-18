@@ -31,6 +31,7 @@ export interface TelosEvmConfig {
     elasticPass: string;
     elasticIndexPrefix: string;
     elasticIndexVersion: string;
+    elasticIndexDocsAmount: number;
     orderNonces: boolean;
     orderNonceRetryTimeout: number;
     syncingThreshhold: number;

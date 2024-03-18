@@ -12,6 +12,10 @@ program
     .option('-c, --config [path to config.json]', 'Path to config.json file', 'config.json')
     .action(async (options) => {
         const config: TelosEvmConfig = JSON.parse(readFileSync(options.config).toString());
+
+        if (!config.elasticIndexDocsAmount)
+                config.elasticIndexDocsAmount = 1e7;
+
         const rpc: TelosEVMRPC = new TelosEVMRPC(config);
 
         console.log("Starting Telos EVM RPC...");
