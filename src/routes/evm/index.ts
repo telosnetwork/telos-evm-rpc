@@ -292,8 +292,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function adjustBlockNum(num: number): number {
-		// convert to native block num and divide over index size 10 million
-		return Math.floor((num + opts.blockNumberDelta) / 1e7);
+		// convert to native block num and divide over dos per index
+		return Math.floor((num + opts.blockNumberDelta) / opts.elasticIndexDocsAmount);
 	}
 
 	function indexSuffixForBlock(blockNumber: number): string {
@@ -569,7 +569,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (indices.length > 1) {
 				const docsCount = parseInt(index['docs.count']);
 				const adjustedNum = indexToSuffixNum(index.index);
-				lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
+				lastBlockNum = (adjustedNum * opts.elasticIndexDocsAmount) + docsCount - opts.blockNumberDelta - 1;
 			} else if (index?.index) {
 				const results = await fastify.elastic.search({
 					index: `${index.index}`,
