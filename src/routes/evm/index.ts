@@ -1753,8 +1753,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				} else {
 					error.message = e?.message;
 				}
-
-				Logger.error(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify({error, exception: e})} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
+				Logger.error(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify(error)} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
 				return { jsonrpc, id, error };
 			}
 		} else {
