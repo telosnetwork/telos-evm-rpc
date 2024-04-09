@@ -200,8 +200,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
     }
 
-	function getVRS(receiptDoc): {v: string, r: string, s: string} {
-		let receipt = receiptDoc["@raw"];
+	function getVRS(receipt): {v: string, r: string, s: string} {
 		const v = removeLeftZeros(BigInt(receipt.v).toString(16), true);
 		const r = removeLeftZeros(receipt.r, true);
 		const s = removeLeftZeros(receipt.s, true);
@@ -450,9 +449,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let bloom = new Bloom();
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
-			for (const receiptDoc of receipts) {
-				const {v, r, s} = getVRS(receiptDoc._source);
-				const receipt = receiptDoc._source['@raw'];
+			for (const receipt of receipts) {
+				const {v, r, s} = getVRS(receipt);
 
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
@@ -528,7 +526,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			size: 2000,
 			query: { bool: { must: [{ term: termStruct }] } }
 		});
-		return results?.hits?.hits;
+		return results?.hits?.hits.map(h => h._source['@raw']);
 	}
 
 	async function getCurrentBlockNumber(indexed: boolean = false, retry: number = 0) {
@@ -1270,7 +1268,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			block = await emptyBlockFromHash(_hash);
 
 		else {
-			const blockNum = receipts[0]['@raw'].block;
+			const blockNum = receipts[0].block;
 			const delta = await getDeltaDocFromNumber(blockNum);
 			block = reconstructBlockFromReceipts(delta, receipts, true, client);
 		}
@@ -1317,8 +1315,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			block = await emptyBlockFromHash(_hash);
 
 		else {
-			const blockNum = receipts[0]['@raw'].block;
-			const delta = await getDeltaDocFromNumber(blockNum);
+			const blockNum = receipts[0].block;
+			const delta = await getDeltaDocFromNumber(blockNum - opts.blockNumberDelta);
 			block = reconstructBlockFromReceipts(delta, receipts, true, client);
 		}
 		return block;
@@ -1707,8 +1705,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			throw new Error("trace_replayBlockTransactions only supports the \"trace\" type of trace (not vmTrace or stateDiff");
 
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
-		const receiptHits = await getReceiptsByTerm("@raw.block", blockNumber);
-		const receipts = receiptHits.map(r => r._source["@raw"]);
+		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
 		const sortedReceipts = receipts.sort((a, b) => {
 			return a.trx_index - b.trx_index;
 		})
@@ -1725,8 +1722,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	methods.set('trace_block', async ([block]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
-		const receiptHits = await getReceiptsByTerm("@raw.block", blockNumber);
-		const receipts = receiptHits.map(r => r._source["@raw"]);
+		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
 		const sortedReceipts = receipts.sort((a, b) => {
 			return a.trx_index - b.trx_index;
 		})
