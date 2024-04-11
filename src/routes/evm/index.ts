@@ -49,24 +49,6 @@ export class Call extends Struct {
 	@Struct.field(Checksum160, {optional: true}) sender?: Checksum160
 }
 
-class Refund extends Struct {
-	static abiName = 'call'
-	static abiFields = [
-		{
-			name: 'ram_payer',
-			type: Name,
-		},
-		{
-			name: 'tx',
-			type: Bytes,
-		},
-		{
-			name: 'sender',
-			type: Checksum160,
-		}
-	]
-}
-
 function jsonRPC2Error(reply: FastifyReply, type: string, requestId: string, message: string, code?: number) {
 	let errorCode = code;
 	switch (type) {
@@ -152,6 +134,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	// 0 is healthy, 1 is lib lag, 2 is head lag
 	let healthStatus = 0
 
+	const nativeToEvm = (blockNum: number) => blockNum - opts.blockNumberDelta;
+	const evmToNative = (evmBlockNum: number) => evmBlockNum + opts.blockNumberDelta;
 	setInterval(async () => {
 		// health check
 		const getInfoResponse = await getInfo()
@@ -290,24 +274,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return deltaIndices;
 	}
 
-	function adjustBlockNum(num: number): number {
+	function adjustEVMBlockNum(evmBlockNum: number): number {
 		// convert to native block num and divide over dos per index
-		return Math.floor((num + opts.blockNumberDelta) / opts.elasticIndexDocsAmount);
+		return Math.floor(evmToNative(evmBlockNum) / opts.elasticIndexDocsAmount);
 	}
 
-	function indexSuffixForBlock(blockNumber: number): string {
-		const adjustedNum = adjustBlockNum(blockNumber);
+	function indexSuffixForEVMBlock(evmBlockNumber: number): string {
+		const adjustedNum = adjustEVMBlockNum(evmBlockNumber);
 		return String(adjustedNum).padStart(8, '0');
 	}
 
-    async function getDeltaDocFromNumber(blockNumber: number) {
-        const indexSuffix = indexSuffixForBlock(blockNumber + opts.blockNumberDelta);
+    async function getDeltaDocFromEVMNumber(evmBlockNumber: number) {
+        const indexSuffix = indexSuffixForEVMBlock(evmBlockNumber);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
 			size: 1,
 			query: {
 				bool: {
-					must: [{ term: { "@global.block_num": blockNumber } }]
+					must: [{ term: { "@global.block_num": evmBlockNumber } }]
 				}
 			}
 		});
@@ -315,10 +299,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return blockDelta;
 	}
 
-	function getIndexSuffixesForBlocks(blockNumbers: number[]) {
+	function getIndexSuffixesForEVMBlocks(evmBlockNumbers: number[]) {
 		const blocksPerSuff = new Map<string, number[]>();
-		for (const blockNum of blockNumbers) {
-			const indexSuff = indexSuffixForBlock(blockNum + opts.blockNumberDelta);
+		for (const blockNum of evmBlockNumbers) {
+			const indexSuff = indexSuffixForEVMBlock(blockNum);
 			const blocks = [blockNum];
 			if (blocksPerSuff.has(indexSuff))
 				blocksPerSuff.get(indexSuff).push(...blocks);
@@ -328,9 +312,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return blocksPerSuff;
 	}
 
-	async function getMultipleReceipts(blockNumbers: number[]) {
+	async function getMultipleReceipts(evmBlockNumbers: number[]) {
 		const receipts = [];
-		for (const [suffix, blocks] of getIndexSuffixesForBlocks(blockNumbers).entries()) {
+		for (const [suffix, blocks] of getIndexSuffixesForEVMBlocks(evmBlockNumbers).entries()) {
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-${suffix}`,
 				size: 2000,
@@ -347,10 +331,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return receipts;
 	}
 
-	async function getMultipleDeltaDocsFromNumbers(blockNumbers: number[]) {
+	async function getMultipleDeltaDocsFromEVMNumbers(evmBlockNumbers: number[]) {
 		const blocksWithReceipts = [];
 		const blocks = [];
-		for (const [suffix, blockNums] of getIndexSuffixesForBlocks(blockNumbers).entries()) {
+		for (const [suffix, blockNums] of getIndexSuffixesForEVMBlocks(evmBlockNumbers).entries()) {
 			const searchBlock = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${suffix}`,
 				size: blockNums.length,
@@ -394,9 +378,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		});
 	}
 
-	async function emptyBlockFromNumber(blockNumber: number) {
+	async function emptyBlockFromEVMNumber(evmBlockNumber: number) {
 		try {
-			const blockDelta = await getDeltaDocFromNumber(blockNumber);
+			const blockDelta = await getDeltaDocFromEVMNumber(evmBlockNumber);
 			if (!blockDelta)
 				return null;
 
@@ -560,14 +544,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (indices.length > 1) {
 				const docsCount = parseInt(index['docs.count']);
 				const adjustedNum = indexToSuffixNum(index.index);
-				lastBlockNum = (adjustedNum * opts.elasticIndexDocsAmount) + docsCount - opts.blockNumberDelta - 1;
+				lastBlockNum = nativeToEvm((adjustedNum * opts.elasticIndexDocsAmount) + docsCount - 1);
 			} else {
 				const results = await fastify.elastic.search({
 					index: `${index.index}`,
 					size: 1,
 					sort: [{"@global.block_num": {order: "desc"}}]
 				});
-				lastBlockNum = results?.hits?.hits[0]?._source["@global"].block_num - opts.blockNumberDelta - 1;
+				lastBlockNum = nativeToEvm(results?.hits?.hits[0]?._source["@global"].block_num - 1);
 
 			}
 
@@ -1263,7 +1247,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		else {
 			const blockNum = receipts[0].block;
-			const delta = await getDeltaDocFromNumber(blockNum);
+			const delta = await getDeltaDocFromEVMNumber(blockNum);
 			block = reconstructBlockFromReceipts(delta, receipts, true, client);
 		}
 
@@ -1284,12 +1268,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return GENESIS_BLOCK;
 		
 
-		const blockDelta = await getDeltaDocFromNumber(blockNumber);
+		const blockDelta = await getDeltaDocFromEVMNumber(blockNumber);
 		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
 			return emptyBlockFromDelta(blockDelta);
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
-		return receipts.length > 0 ? reconstructBlockFromReceipts(blockDelta, receipts, full, client) : await emptyBlockFromNumber(blockNumber);
+		return receipts.length > 0 ? reconstructBlockFromReceipts(blockDelta, receipts, full, client) : await emptyBlockFromEVMNumber(blockNumber);
 	});
 
 	/**
@@ -1310,7 +1294,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		else {
 			const blockNum = receipts[0].block;
-			const delta = await getDeltaDocFromNumber(blockNum - opts.blockNumberDelta);
+			const delta = await getDeltaDocFromEVMNumber(blockNum);
 			block = reconstructBlockFromReceipts(delta, receipts, true, client);
 		}
 		return block;
@@ -1846,7 +1830,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			const promises = [];
 			// gather all getBlockByNumber requests
-			const requestedBlockNums = [];
+			const getBlockRequests = [];
 			// used to order responses after async processing
 			const respMap = new Map<number, any>();
 
@@ -1855,22 +1839,30 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				let { jsonrpc, id, method, params } = payload[i];
 				if (method === 'eth_getBlockByNumber') {
 					// gather block request info for later
-					requestedBlockNums.push({params, index: i});
+					getBlockRequests.push({params, index: i});
 				} else {
 					// normal request
 					promises.push(doRpcMethod(payload[i], clientInfo, reply).then(resp => respMap.set(i, resp)));
 				}
 			}
 
-			if (requestedBlockNums.length > 0) {
+			if (getBlockRequests.length > 0) {
+				const requestedBlocks = getBlockRequests.map(req => {
+					let num = req.params[0];
+					if (typeof num === 'string')
+						num = parseInt(num, 16);
+
+					return num;
+				})
+
 				// perform optimized batch get block by number request
 				promises.push(
-					getMultipleDeltaDocsFromNumbers(requestedBlockNums.map(req => req.params[0])).then(
+					getMultipleDeltaDocsFromEVMNumbers(requestedBlocks).then(
 						blockData => {
 							const [blocks, allReceipts] = blockData;
 							for (const delta of blocks) {
 								const blockNum = delta['@global'].block_num;
-								const request = requestedBlockNums.find(req => req.params[0] == blockNum);
+								const request = getBlockRequests.find(req => req.params[0] == blockNum);
 								if (!delta.txAmount) {
 									respMap.set(request.index, emptyBlockFromDelta(delta));
 									continue;
