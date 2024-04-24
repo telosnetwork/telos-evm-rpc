@@ -4,8 +4,11 @@ import WebSocket from "ws";
 import {TelosEvmConfig} from "../types";
 import Subscription from "./Subscription";
 import LogSubscription from "./LogSubscription";
+import {createLogger} from "../util/logger";
+import {BigNumber} from 'ethers';
 
 const NEW_HEADS_SUBSCRIPTION = "0x9ce59a13059e417087c02d3236a0b1cd"
+const logger = createLogger('telos-evm-rpc-ws');
 
 export default class WebsocketRPC {
 
@@ -18,6 +21,7 @@ export default class WebsocketRPC {
 
 
     constructor(config: TelosEvmConfig, rpcHandlerContainer: any) {
+        console.log('Initializing Websocket...');
         this.config = config;
         this.initUWS();
         this.initWSClient();
@@ -36,23 +40,21 @@ export default class WebsocketRPC {
     initUWS(): void {
         const host = this.config.rpcWebsocketHost;
         const port = this.config.rpcWebsocketPort;
+        let ip, origin;
         this.websocketRPC = uWS.App({}).ws('/evm', {
             compression: 0,
             maxPayloadLength: 16 * 1024 * 1024,
             idleTimeout: 30,
-            upgrade: (res, req, context) => {
-                let ip = req.getHeader('x-forwarded-for') || '';
-                if (Array.isArray(ip))
-                    ip = ip[0] || ''
+            upgrade: (res: uWS.HttpResponse, req: uWS.HttpRequest, context: uWS.us_socket_context_t) => {
+                const tRef = process.hrtime.bigint();
+                const buffer = Buffer.from(res.getRemoteAddressAsText());
+                const string = buffer.toString();
+                ip = req.getHeader('x-forwarded-for') || string || '';
 
-                if (ip.includes(','))
-                    ip = ip.substr(0, ip.indexOf(','));
-
-                let origin;
                 if (req.getHeader('origin') === 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn') {
                     origin = 'MetaMask';
                 } else {
-                    if (req.getHeader('origin')) {
+                    if (req.getHeader('origin') && req.getHeader('origin').length > 0) {
                         origin = req.getHeader('origin');
                     } else {
                         origin = req.getHeader('user-agent');
@@ -66,22 +68,25 @@ export default class WebsocketRPC {
                     req.getHeader('sec-websocket-extensions'),
                     context
                 )
+
+                const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+                console.log(`WSCONNECT:  ${new Date().toISOString()} - ${duration} μs - ${ip} (0/0) - ${origin} - connect`);
             },
-            message: (ws, msg) => {
-                this.handleMessage(ws, msg);
+            message: (ws: uWS.WebSocket, msg: ArrayBuffer) => {
+                this.handleMessage(ws, msg, ip, origin);
             },
             drain: () => {
             },
-            close: (ws) => {
+            close: (ws: uWS.WebSocket) => {
                 this.headSubscription.removeWs(ws, true);
                 for (const [subId, sub] of this.logSubscriptions)
                     sub.removeWs(ws, true)
             },
-        }).listen(host, port, (token) => {
+        }).listen(host, port, (token: uWS.us_listen_socket) => {
             if (token) {
-                console.log('Listening to port ' + port);
+                console.log('Websocket listening to port ' + port);
             } else {
-                console.log('Failed to listen to port ' + port);
+                console.log('Websocket failed to listen to port ' + port);
             }
         });
     }
@@ -94,7 +99,8 @@ export default class WebsocketRPC {
         return {"jsonrpc": "2.0", "error": {code, message}, id};
     }
 
-    async handleMessage(ws, msg) {
+    async handleMessage(ws, msg, ip, origin) {
+        const tRef = process.hrtime.bigint();
         const buffer = Buffer.from(msg);
         const string = buffer.toString();
         try {
@@ -103,14 +109,13 @@ export default class WebsocketRPC {
                 ws.send(this.makeError("Invalid Request, no method specified", msgObj.id ? msgObj.id : null));
                 return;
             }
-
             const method = msgObj.method;
             if (method == "eth_subscribe") {
                 this.handleSubscription(ws, msgObj);
+                const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+                console.log(`WSSUBSCRIBE:  ${new Date().toISOString()} - ${duration} μs - ${ip} (0/0) - ${origin} - ${msgObj.params[0]}`);
                 return;
-            }
-
-            if (method === "eth_unsubscribe") {
+            } else if (method === "eth_unsubscribe") {
                 if (!msgObj?.params?.length) {
                     ws.send(JSON.stringify(this.makeError("Subscription ID should be provided as first parameter", msgObj.id)))
                     return;
@@ -128,11 +133,26 @@ export default class WebsocketRPC {
                     });
                 }
                 ws.send(JSON.stringify(this.makeResponse(true, msgObj)));
+                const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+                console.log(`WSUNSUBSCRIBE:  ${new Date().toISOString()} - ${duration} μs - ${ip} (0/0) - ${origin} - ${msgObj.params[0]}`);
+                return;
+            } else if (method === "eth_unsubscribeAll") {
+                this.headSubscription.removeWs(ws, false);
+                this.logSubscriptions.forEach((sub) => {
+                    sub.removeWs(ws, false);
+                    if (!sub.hasClients())
+                        this.logSubscriptions.delete(sub.getId());
+                });
+                ws.send(JSON.stringify(this.makeResponse(true, msgObj)));
+                const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+                console.log(`WSUNSUBSCRIBE:  ${new Date().toISOString()} - ${duration} μs - ${ip} (0/0) - ${origin} - all`);
                 return;
             }
 
             const rpcResponse = await this.rpcHandlerContainer.handler(msgObj, ws.clientInfo);
             ws.send(JSON.stringify(rpcResponse));
+            const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+            console.log(`WS:  ${new Date().toISOString()} - ${duration} μs - ${ip} (0/0) - ${origin} - ${msgObj.method}`);
         } catch (e) {
             console.error(`Failed to parse websocket message: ${string} error: ${e.message}`);
         }
@@ -154,6 +174,9 @@ export default class WebsocketRPC {
 
     async handleLogSubscription(ws, msgObj): Promise<void> {
         const filter = msgObj.params[1];
+        if(!filter?.address){
+            ws.send(JSON.stringify(this.makeError("address should be provided in params", msgObj.id)));
+        }
         const subscriptionId = LogSubscription.makeId(filter);
         if (!this.logSubscriptions.has(subscriptionId)) {
             this.logSubscriptions.set(subscriptionId, new LogSubscription(this.websocketRPC, subscriptionId, filter, this.config.debug))
@@ -187,21 +210,32 @@ export default class WebsocketRPC {
 
     handleRawMessage(data): void {
         for (const [subId, sub] of this.logSubscriptions) {
+            const tRef = process.hrtime.bigint();
             sub.handleRawAction(data);
+            const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+            for(let ws of  sub.wsClients){
+                console.log(`WSPUBLISH:  ${new Date().toISOString()} - ${duration} μs - ${ws[0].clientInfo.ip} (0/0) - ${ws[0].clientInfo.origin} - ${data.type.toUppercase()}`);
+            }
         }
     }
 
     handleHeadMessage(head): void {
-        const headMessage = {
-            "jsonrpc": "2.0",
-            "method": "eth_subscription",
-            "params": {
-                "subscription": this.headSubscription.getId(),
-                "result": head
+        const tRef = process.hrtime.bigint();
+        if(this.headSubscription.hasClients()){
+            const headMessage = {
+                "jsonrpc": "2.0",
+                "method": "eth_subscription",
+                "params": {
+                    "subscription": this.headSubscription.getId(),
+                    "result": head
+                }
+            };
+            this.headSubscription.publish(JSON.stringify(headMessage));
+            const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
+            for(let ws of this.headSubscription.wsClients){
+                console.log(`WSPUBLISH:  ${new Date().toISOString()} - ${duration} μs - ${ws[0].clientInfo.ip} (0/0) - ${ws[0].clientInfo.origin} - newHeads`);
             }
-        };
-
-        this.headSubscription.publish(JSON.stringify(headMessage));
+        }
     }
 
 }
