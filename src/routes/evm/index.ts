@@ -1519,10 +1519,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
                                 action: {
                                     callType: toOpname(itx.callType),
                                     //why is 0x not in the receipt table?
-                                    from: itx.from,
+                                    from: toChecksumAddress(itx.from).toLowerCase(),
                                     gas: addHexPrefix(itx.gas),
                                     input: addHexPrefix(itx.input),
-                                    to: itx.to,
+                                    to: toChecksumAddress(itx.to)?.toLowerCase(),
                                     value: addHexPrefix(itx.value)
                                 },
                                 blockHash: addHexPrefix(doc['@raw']['block_hash']),
