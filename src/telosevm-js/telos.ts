@@ -87,13 +87,22 @@ export class TelosEvmApi {
     antelopeChainId: string
     retryTrxNumBlocks: number
   }) {
-    this.readAPI = new APIClient({
-      provider: new FetchProvider(nodeosRead)
-    })
+    try {
+      let provider = new FetchProvider(nodeosRead);
+      this.readAPI = new APIClient({
+        provider: provider
+      })
+    } catch (e) {
+      throw new Error(`Failed to create read API: ${e.message}`)
+    }
     this.signingPermission = signingPermission || 'active'
-    this.writeAPI =  new APIClient({
-      provider: new FetchProvider(nodeosWrite)
-    })
+    try {
+      this.writeAPI =  new APIClient({
+        provider: new FetchProvider(nodeosWrite)
+      })
+    } catch (e) {
+      throw new Error(`Failed to create write API: ${e.message}`)
+    }
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
