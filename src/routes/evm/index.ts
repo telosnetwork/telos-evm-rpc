@@ -395,9 +395,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
-				let finalFrom = receipt['from'];
-				if (receipt['from'] == zeros)
-					finalFrom = toChecksumAddress(receipt['from']);
+				let finalFrom = toChecksumAddress(receipt['from']);
 				if (!full) {
 					trxs.push(receipt['hash']);
 				} else {
@@ -416,7 +414,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
-						to: receipt['to']?.toLowerCase(),
+						to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 						transactionIndex: hexTransactionIndex,
 						value: hexValue,
 						v, r, s
