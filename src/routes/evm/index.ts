@@ -1129,7 +1129,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
-				contractAddress: _contractAddr?.toLowerCase(),
+				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: removeLeftZeros(_gas),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
