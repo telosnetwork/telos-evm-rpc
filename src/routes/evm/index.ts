@@ -1086,11 +1086,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					return nonceRetryManager.submitFailedRawTrx(signedTx);
 				}
             }
-
-            if (e instanceof TransactionError){
-                throw e;
-			}
-
 			throw e;
 		}
 	});
