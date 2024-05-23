@@ -301,7 +301,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return String(adjustedNum).padStart(8, '0');
 	}
 
-    async function getDeltaDocFromNumber(blockNumber: number) {
+    async function getDeltaDocFromNumber(blockNumber: number, retry: number = 0) {
         const indexSuffix = indexSuffixForBlock(blockNumber);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
@@ -313,6 +313,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 		});
 		const blockDelta = results?.hits?.hits[0]?._source;
+		if(!blockDelta && retry < 3){
+			retry++;
+			await new Promise(resolve => {
+				setTimeout(resolve, 500 * retry);
+			});
+			return getDeltaDocFromNumber(blockNumber, retry);
+		} else if(!blockDelta){
+			Logger.error(`Could not find delta doc for block number ${blockNumber}`);
+		}
 		return blockDelta;
 	}
 
