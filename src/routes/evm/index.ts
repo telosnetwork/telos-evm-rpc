@@ -301,7 +301,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return String(adjustedNum).padStart(8, '0');
 	}
 
-    async function getDeltaDocFromNumber(blockNumber: number) {
+    async function getDeltaDocFromNumber(blockNumber: number, retry: number = 0) {
         const indexSuffix = indexSuffixForBlock(blockNumber);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-delta-${opts.elasticIndexVersion}-${indexSuffix}`,
@@ -313,6 +313,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 		});
 		const blockDelta = results?.hits?.hits[0]?._source;
+		if(!blockDelta && retry < 3){
+			retry++;
+			await new Promise(resolve => {
+				setTimeout(resolve, 500 * retry);
+			});
+			return getDeltaDocFromNumber(blockNumber, retry);
+		} else if(!blockDelta){
+			Logger.error(`Could not find delta doc for block number ${blockNumber}`);
+		}
 		return blockDelta;
 	}
 
@@ -395,9 +404,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
-				let finalFrom = receipt['from'];
-				if (receipt['from'] == zeros)
-					finalFrom = toChecksumAddress(receipt['from']);
+				let finalFrom = toChecksumAddress(receipt['from']);
 				if (!full) {
 					trxs.push(receipt['hash']);
 				} else {
@@ -410,13 +417,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					trxs.push({
 						blockHash: blockHash,
 						blockNumber: hexBlockNum,
-						from: finalFrom,
+						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
-						to: toChecksumAddress(receipt['to']),
+						to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 						transactionIndex: hexTransactionIndex,
 						value: hexValue,
 						v, r, s
@@ -465,7 +472,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return results?.hits?.hits;
 	}
 
-	async function getCurrentBlockNumber(indexed: boolean = false) {
+	async function getCurrentBlockNumber(indexed: boolean = false, retry: number = 0) {
 		if (!indexed) {
 			const key = `${CACHE_PREFIX}_last_onchain_block`;
 			const cachedData = await fastify.redis.get(key);
@@ -504,14 +511,20 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const docsCount = parseInt(index['docs.count']);
 				const adjustedNum = indexToSuffixNum(index.index);
 				lastBlockNum = (adjustedNum * 1e7) + docsCount - opts.blockNumberDelta - 1;
-			} else {
+			} else if (index?.index) {
 				const results = await fastify.elastic.search({
 					index: `${index.index}`,
 					size: 1,
 					sort: [{"@global.block_num": {order: "desc"}}]
 				});
 				lastBlockNum = results?.hits?.hits[0]?._source["@global"].block_num - opts.blockNumberDelta - 1;
-
+			} else if (retry < 3) {
+				await new Promise(resolve => {
+					setTimeout(resolve, 1000);
+				});
+				return getCurrentBlockNumber(indexed, retry+1);
+			} else {
+				throw new Error('Could not find last indexed block. Check connection to ElasticSearch.');
 			}
 
 			let currentBlockNumber = addHexPrefix((Number(lastBlockNum)).toString(16));
@@ -1053,7 +1066,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
 			let receipt = JSON.parse(receiptLog);
-			// This error handling looks wrong, we should not be throwing errors like this directly for everything...
 			if (receipt.status === 0) {
 				let err = new TransactionError('Transaction error');
 				let output = addHexPrefix(receipt.output);
@@ -1078,17 +1090,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return addHexPrefix(rawResponse.eth.transactionHash);
 		} catch (e) {
 			if (opts.orderNonces) {
-                // The previous version with eosjs was:
-                // const assertionMessage = e?.details[0]?.message
 				const assertionMessage = e?.response?.json?.error?.details[0]?.message
 				if (assertionMessage && assertionMessage.includes('incorrect nonce')) {
 					return nonceRetryManager.submitFailedRawTrx(signedTx);
 				}
             }
-
-            if (e instanceof TransactionError)
-                throw e;
-
 			throw e;
 		}
 	});
@@ -1132,13 +1138,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
-				contractAddress: toChecksumAddress(_contractAddr),
+				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: removeLeftZeros(_gas),
-				from: toChecksumAddress(receipt['from']),
+				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
 				status: removeLeftZeros(numToHex(receipt['status'])),
-				to: toChecksumAddress(receipt['to']),
+				to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 				transactionHash: receipt['hash'],
 				transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
 				logs: buildLogsObject(
@@ -1176,13 +1182,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return {
 			blockHash: _blockHash,
 			blockNumber: removeLeftZeros(_blockNum),
-			from: toChecksumAddress(receipt['from']),
+			from: toChecksumAddress(receipt['from']).toLowerCase(),
 			gas: removeLeftZeros(numToHex(receipt.gas_limit)),
 			gasPrice: removeLeftZeros(numToHex(receipt.charged_gas_price)),
 			hash: receipt['hash'],
 			input: receipt['input_data'],
 			nonce: removeLeftZeros(numToHex(receipt['nonce'])),
-			to: toChecksumAddress(receipt['to']),
+			to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 			transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
 			value: removeLeftZeros(receipt['value']),
 			v: removeLeftZeros(v),
@@ -1515,10 +1521,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
                                 action: {
                                     callType: toOpname(itx.callType),
                                     //why is 0x not in the receipt table?
-                                    from: toChecksumAddress(itx.from),
+                                    from: toChecksumAddress(itx.from).toLowerCase(),
                                     gas: addHexPrefix(itx.gas),
                                     input: addHexPrefix(itx.input),
-                                    to: toChecksumAddress(itx.to),
+                                    to: toChecksumAddress(itx.to)?.toLowerCase(),
                                     value: addHexPrefix(itx.value)
                                 },
                                 blockHash: addHexPrefix(doc['@raw']['block_hash']),
@@ -1742,18 +1748,20 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					return { jsonrpc, id, error };
 				}
 
+				let type: string = 'RPCERROR';
 				let error: any = { code: 3 };
-				if (e?.json?.error?.code === 3050003) {
-					let message = e?.json?.error?.details[0]?.message;
+				if (e?.response?.json?.error?.code === 3050003) {
+					let message = e?.response?.json?.error?.details[0]?.message;
 
 					if (message.startsWith(EOSIO_ASSERTION_PREFIX))
 						message = message.substr(EOSIO_ASSERTION_PREFIX.length, message.length + 1);
+						type = 'RPCREVERT';
 
 					error.message = message;
 				} else {
 					error.message = e?.message;
 				}
-				Logger.error(`RPCERROR: ${new Date().toISOString()} - ${ip} - ${JSON.stringify(error)} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
+				Logger.error(`${type}: ${new Date().toISOString()} - ${ip} - ${JSON.stringify(error)} | Method: ${method} | REQ: ${JSON.stringify(params)}`);
 				return { jsonrpc, id, error };
 			}
 		} else {
