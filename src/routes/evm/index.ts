@@ -432,6 +432,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 
 			const block = await getDeltaDocFromNumber(blockNum);
+			if(!block){
+				Logger.error("Could not find block for receipts");
+				return null;
+			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
 			const extraData = addHexPrefix(block['@blockHash']);
@@ -1225,6 +1229,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		
 
 		const blockDelta = await getDeltaDocFromNumber(blockNumber);
+		if(!blockDelta){
+			Logger.error(`Could not find block from block number ${blockNumber}`);
+			return null;
+		}
 		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
 			return emptyBlockFromDelta(blockDelta);
 
