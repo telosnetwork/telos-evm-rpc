@@ -214,7 +214,7 @@ export default class WebsocketRPC {
             sub.handleRawAction(data);
             const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
             for(let ws of  sub.wsClients){
-                console.log(`WSPUBLISH:  ${new Date().toISOString()} - ${duration} μs - ${ws[0].clientInfo.ip} (0/0) - ${ws[0].clientInfo.origin} - ${data.type.toUppercase()}`);
+                console.log(`WSPUBLISH:  ${new Date().toISOString()} - ${duration} μs - ${ws[0].clientInfo.ip} (0/0) - ${ws[0].clientInfo.origin} - raw`);
             }
         }
     }
