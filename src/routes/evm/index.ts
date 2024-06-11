@@ -1211,10 +1211,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
 		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
-		if(!block || block.transactions?.length === 0) return null; // Todo: check if we should throw an error if block not found
+		if(!block || block.transactions?.length === 0) return null; 
 		const trxIndex = parseInt(trxIndexHex, 16);
+		if(!block.transactions[trxIndex]) return null; 
 		let trx = block.transactions[trxIndex];
-		trx.type = "0x0";
+		trx.type = "0x0"; // TODO: Determine type with 1559
 		trx.chainId = CHAIN_ID_HEX;
 		return trx;
 	});
@@ -1229,13 +1230,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return GENESIS_BLOCK;
 		
 
-		const blockDelta = await getDeltaDocFromNumber(blockNumber);
-		if(!blockDelta){
-			Logger.error(`Could not find block from block number ${blockNumber}`);
-			return null;
+		try {
+			const blockDelta = await getDeltaDocFromNumber(blockNumber);
+			if(!blockDelta){
+				Logger.error(`Could not find block from block number ${blockNumber}`);
+				return null;
+			}
+			if (blockDelta['@transactionsRoot'] === NULL_TRIE)
+				return emptyBlockFromDelta(blockDelta);
+		} catch (e) {
+			Logger.error(`Could not find block from block number ${blockNumber}: ${e}`);
+			if(e?.message.startsWith("index_not_found_exception")){
+				return null;
+			}
+			throw(e);
 		}
-		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
-			return emptyBlockFromDelta(blockDelta);
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromNumber(blockNumber);
