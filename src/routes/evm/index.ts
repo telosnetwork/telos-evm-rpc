@@ -432,6 +432,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 
 			const block = await getDeltaDocFromNumber(blockNum);
+			if(!block){
+				Logger.error("Could not find block for receipts");
+				return null;
+			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
 			const extraData = addHexPrefix(block['@blockHash']);
@@ -1207,9 +1211,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
 		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(_hash);
+		if(!block || block.transactions?.length === 0) return null; 
 		const trxIndex = parseInt(trxIndexHex, 16);
-		let trx = block.transactions.length > trxIndex ? block.transactions[trxIndex] : null;
-		trx.type = "0x0";
+		if(!block.transactions[trxIndex]) return null; 
+		let trx = block.transactions[trxIndex];
+		trx.type = "0x0"; // TODO: Determine type with 1559
 		trx.chainId = CHAIN_ID_HEX;
 		return trx;
 	});
@@ -1224,9 +1230,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return GENESIS_BLOCK;
 		
 
-		const blockDelta = await getDeltaDocFromNumber(blockNumber);
-		if (blockDelta['@transactionsRoot'] === NULL_TRIE)
-			return emptyBlockFromDelta(blockDelta);
+		try {
+			const blockDelta = await getDeltaDocFromNumber(blockNumber);
+			if(!blockDelta){
+				Logger.error(`Could not find block from block number ${blockNumber}`);
+				return null;
+			}
+			if (blockDelta['@transactionsRoot'] === NULL_TRIE)
+				return emptyBlockFromDelta(blockDelta);
+		} catch (e) {
+			Logger.error(`Could not find block from block number ${blockNumber}: ${e}`);
+			if(e?.message.startsWith("index_not_found_exception")){
+				return null;
+			}
+			throw(e);
+		}
 
 		const receipts = await getReceiptsByTerm("@raw.block", blockNumber);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromNumber(blockNumber);
