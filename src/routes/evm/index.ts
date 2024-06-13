@@ -331,6 +331,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
+		const baseFeePerGas = removeLeftZeros(numToHex(blockDelta['@baseFeePerGas']));
 
 		return Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
@@ -340,6 +341,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			number: blockNumberHex,
 			timestamp: removeLeftZeros(timestamp?.toString(16)),
 			transactions: [],
+			baseFeePerGas: baseFeePerGas,
 			extraData: extraData
 		});
 	}
@@ -383,7 +385,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function reconstructBlockFromReceipts(receipts: any[], full: boolean, client: any) {
 		try {
-			let blockHash;
+			let blockHash: string;
 			let blockHex: string;
 			let blockNum: number;
 			let logsBloom: any = null;
@@ -414,12 +416,18 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					const hexNonce = removeLeftZeros(numToHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(numToHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
+					// IEP 1559
+					const maxPriorityFee = removeLeftZeros(numToHex(receipt['max_priority_fee_per_gas']));
+					const maxFee = removeLeftZeros(numToHex(receipt['max_fee_per_gas']));
+
 					trxs.push({
 						blockHash: blockHash,
 						blockNumber: hexBlockNum,
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
+						maxFeePerGas: maxFee,
+						maxPriorityFeePerGas: maxPriorityFee,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -455,7 +463,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
-
+				baseFeePerGas: removeLeftZeros(numToHex(block['@baseFeePerGas'])),
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
@@ -1058,6 +1066,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		try {
+			// TODO: make work for type 2 transactions
 			const rawResponse = await fastify.evm.raw({
 				account: opts.signerAccount,
 				tx: signedTx,

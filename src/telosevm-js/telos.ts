@@ -1,6 +1,6 @@
 import { Account } from './interfaces'
 import * as ethTx from '@ethereumjs/tx'
-const { Transaction } = ethTx
+const { Transaction, FeeMarketEIP1559Transaction } = ethTx
 import Common from '@ethereumjs/common'
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
@@ -282,9 +282,10 @@ export class TelosEvmApi {
       console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
     }
 
-    let trx = Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {
-      common: this.chainConfig
-    })
+    // EIP 1559 support
+    let trx = (tx.startsWith('02')) ?
+      FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig}) :
+      Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
     response.eth = {
       transactionHash: trx.hash().toString('hex'),
