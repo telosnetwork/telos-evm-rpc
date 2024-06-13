@@ -26,7 +26,7 @@ export default class TelosEVMRPC {
 
     common: Common;
     baseChain = 'mainnet';
-    hardfork = 'istanbul';
+    hardfork = 'london';
     fastify: FastifyInstance;
     config: TelosEvmConfig;
     websocketRPC: WebsocketRPC
