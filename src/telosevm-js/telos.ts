@@ -106,7 +106,7 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London });
+    this.chainConfig = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
     this.telosContract = telosContract
     this.debug = false
   }

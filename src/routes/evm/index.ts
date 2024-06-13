@@ -1066,7 +1066,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		try {
-			// TODO: make work for type 2 transactions
 			const rawResponse = await fastify.evm.raw({
 				account: opts.signerAccount,
 				tx: signedTx,
