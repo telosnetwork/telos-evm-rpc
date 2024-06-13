@@ -28,7 +28,7 @@
   "dependencies": {
     "@dnlup/fastify-traps": "^2.0.0",
     "@elastic/elasticsearch": "^8.7.0",
-    "@ethereumjs/common": "^2.4.0",
+    "@ethereumjs/common": "^4.3.0",
     "@ethereumjs/tx": "^3.3.0",
     "@ethereumjs/util": "^8.0.2",
     "@fastify/cors": "^8.2.1",
