@@ -106,7 +106,35 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = Common.forCustomChain(ETH_CHAIN, { chainId: evmChainId }, FORK, ['istanbul', 'berlin', 'london'])
+    this.chainConfig = Common.forCustomChain(ETH_CHAIN, { chainId: evmChainId, hardforks: [
+      {
+        name: 'byzantium',
+        block: 0
+      },
+      {
+        name: 'constantinople',
+        block: 0
+      },
+      {
+        name: 'petersburg',
+        block: 0
+      },
+      {
+        name: 'istanbul',
+        block: 0
+      },
+      {
+        name: 'muirGlacier',
+        block: 0
+      },
+      {
+        name: 'berlin',
+        block: 0
+      },
+      {
+        name: 'london',
+        block: 0 // Set to 0 to activate immediately, or use the correct block number
+      }]}, FORK)
     this.telosContract = telosContract
     this.debug = false
   }

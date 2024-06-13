@@ -37,9 +37,40 @@ export default class TelosEVMRPC {
         if (config.chainId) {
             this.common = Common.forCustomChain(
                 this.baseChain,
-                {chainId: config.chainId},
-                this.hardfork,
-                ['istanbul', 'berlin', 'london']
+                {
+                    chainId: config.chainId,
+                    hardforks: [
+                        {
+                          name: 'byzantium',
+                          block: 0
+                        },
+                        {
+                          name: 'constantinople',
+                          block: 0
+                        },
+                        {
+                          name: 'petersburg',
+                          block: 0
+                        },
+                        {
+                          name: 'istanbul',
+                          block: 0
+                        },
+                        {
+                          name: 'muirGlacier',
+                          block: 0
+                        },
+                        {
+                          name: 'berlin',
+                          block: 0
+                        },
+                        {
+                          name: 'london',
+                          block: 0 // Set to 0 to activate immediately, or use the correct block number
+                        }
+                    ]
+                },
+                this.hardfork
             );
         }
 
