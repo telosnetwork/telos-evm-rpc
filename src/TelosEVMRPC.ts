@@ -1,7 +1,7 @@
 import {fastify, FastifyInstance, FastifyListenOptions} from "fastify";
 import fastifyTraps from '@dnlup/fastify-traps'
 import fastifyCors from '@fastify/cors'
-import Common, {default as ethCommon, Hardfork} from '@ethereumjs/common';
+import Common, {Chain, default as ethCommon, Hardfork} from '@ethereumjs/common';
 import {createLogger} from "./util/logger";
 import evmRoute from './routes/evm'
 import {RedisClientConnection, TelosEvmConfig} from "./types";
@@ -35,43 +35,7 @@ export default class TelosEVMRPC {
         this.config = config
         this.debug = config.debug
         if (config.chainId) {
-            this.common = Common.forCustomChain(
-                this.baseChain,
-                {
-                    chainId: config.chainId,
-                    hardforks: [
-                        {
-                          name: 'byzantium',
-                          block: 0
-                        },
-                        {
-                          name: 'constantinople',
-                          block: 0
-                        },
-                        {
-                          name: 'petersburg',
-                          block: 0
-                        },
-                        {
-                          name: 'istanbul',
-                          block: 0
-                        },
-                        {
-                          name: 'muirGlacier',
-                          block: 0
-                        },
-                        {
-                          name: 'berlin',
-                          block: 0
-                        },
-                        {
-                          name: 'london',
-                          block: 0 // Set to 0 to activate immediately, or use the correct block number
-                        }
-                    ]
-                },
-                this.hardfork
-            );
+            this.common = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London });
         }
 
         this.fastify = fastify({

@@ -1,7 +1,7 @@
 import { Account } from './interfaces'
 import * as ethTx from '@ethereumjs/tx'
 const { Transaction, FeeMarketEIP1559Transaction } = ethTx
-import Common from '@ethereumjs/common'
+import Common, { Chain, Hardfork } from '@ethereumjs/common'
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -106,35 +106,7 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = Common.forCustomChain(ETH_CHAIN, { chainId: evmChainId, hardforks: [
-      {
-        name: 'byzantium',
-        block: 0
-      },
-      {
-        name: 'constantinople',
-        block: 0
-      },
-      {
-        name: 'petersburg',
-        block: 0
-      },
-      {
-        name: 'istanbul',
-        block: 0
-      },
-      {
-        name: 'muirGlacier',
-        block: 0
-      },
-      {
-        name: 'berlin',
-        block: 0
-      },
-      {
-        name: 'london',
-        block: 0 // Set to 0 to activate immediately, or use the correct block number
-      }]}, FORK)
+    this.chainConfig = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London });
     this.telosContract = telosContract
     this.debug = false
   }
