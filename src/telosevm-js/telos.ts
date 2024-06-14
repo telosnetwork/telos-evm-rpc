@@ -1,6 +1,6 @@
 import { Account } from './interfaces'
 import { LegacyTransaction, FeeMarketEIP1559Transaction } from '@ethereumjs/tx'
-import Common, {Chain, CustomChain, default as ethCommon, Hardfork} from '@ethereumjs/common';
+import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -105,7 +105,11 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = new ethCommon.Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
+    this.chainConfig = new Common({
+      chain: evmChainId,
+      hardfork: Hardfork.London,
+      eips: [1559]
+    });
     this.telosContract = telosContract
     this.debug = false
   }
