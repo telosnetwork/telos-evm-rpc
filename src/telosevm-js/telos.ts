@@ -291,7 +291,7 @@ export class TelosEvmApi {
       LegacyTransaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
     response.eth = {
-      transactionHash: trx.hash().toString(),
+      transactionHash: Array.from(trx.hash()).map(byte => byte.toString(16).padStart(2, '0')).join(''),
       transaction: trx,
       from: sender
     }
@@ -641,7 +641,7 @@ export class TelosEvmApi {
 
     const tx = new LegacyTransaction(txData, { common: this.chainConfig })
 
-    
+    return Array.from(tx.serialize()).map(byte => byte.toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
