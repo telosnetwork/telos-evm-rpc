@@ -106,7 +106,7 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.common = Common.custom(Chain.Mainnet, { chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
+    this.chainConfig = Common.custom({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
     this.telosContract = telosContract
     this.debug = false
   }
@@ -283,7 +283,7 @@ export class TelosEvmApi {
     }
 
     // EIP 1559 support
-    let trx = (tx.startsWith('02')) ?
+    let trx = (tx.startsWith('03')) ?
       FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig}) :
       Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
