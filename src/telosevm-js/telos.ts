@@ -641,7 +641,7 @@ export class TelosEvmApi {
 
     const tx = new LegacyTransaction(txData, { common: this.chainConfig })
 
-    return tx.serialize().toString()
+    
   }
 
   private async getAbi(): Promise<ABI.Def> {

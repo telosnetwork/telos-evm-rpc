@@ -61,7 +61,7 @@ export default class NonceRetryManager {
         else
             this.queuedSenders.set(sender, new FailedTrxList(sender, failedTrx));
 
-        return addHexPrefix(trx.hash().toString());
+        return addHexPrefix(Array.from(trx.hash()).map(byte => byte.toString(16).padStart(2, '0')).join(''));
     }
 
     private async pollPendingTransactions() {
