@@ -283,7 +283,7 @@ export class TelosEvmApi {
     }
 
     // EIP 1559 support
-    let trx = (tx.startsWith('03')) ?
+    let trx = (tx.startsWith('02')) ?
       FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig}) :
       Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
