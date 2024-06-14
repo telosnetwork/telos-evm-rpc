@@ -1,4 +1,4 @@
-import { FeeMarketEIP1559Transaction, Transaction } from "@ethereumjs/tx"
+import { FeeMarketEIP1559Transaction, LegacyTransaction } from "@ethereumjs/tx"
 import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
 import {addHexPrefix} from "@ethereumjs/util";
@@ -44,11 +44,11 @@ export default class NonceRetryManager {
 
         let trx = (rawTx.startsWith('02')) ? 
             FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(rawTx, 'hex'), {common: this.telosEvmJs.chainConfig}) :
-            Transaction.fromSerializedTx(Buffer.from(rawTx, 'hex'), { common: this.telosEvmJs.chainConfig})
+            LegacyTransaction.fromSerializedTx(Buffer.from(rawTx, 'hex'), { common: this.telosEvmJs.chainConfig})
         ;
 
-        const sender = trx.getSenderAddress().toString();
-        const nonce = trx.nonce.toNumber();
+        const sender: string = trx.getSenderAddress().toString();
+        const nonce: number = Number(trx.nonce);
 
         const failedTrx = {
             sender, nonce, rawTx,
@@ -61,7 +61,7 @@ export default class NonceRetryManager {
         else
             this.queuedSenders.set(sender, new FailedTrxList(sender, failedTrx));
 
-        return addHexPrefix(trx.hash().toString('hex'));
+        return addHexPrefix(trx.hash().toString());
     }
 
     private async pollPendingTransactions() {

@@ -1,7 +1,6 @@
 import { Account } from './interfaces'
-import * as ethTx from '@ethereumjs/tx'
-const { Transaction, FeeMarketEIP1559Transaction } = ethTx
-import Common, { Chain, Hardfork } from '@ethereumjs/common'
+import { LegacyTransaction, FeeMarketEIP1559Transaction } from '@ethereumjs/tx'
+import Common, {Chain, CustomChain, default as ethCommon, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -106,7 +105,7 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
+    this.chainConfig = new ethCommon.Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
     this.telosContract = telosContract
     this.debug = false
   }
@@ -284,11 +283,11 @@ export class TelosEvmApi {
 
     // EIP 1559 support
     let trx = (tx.startsWith('02')) ?
-      FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.z}) :
-      Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
+      FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig}) :
+      LegacyTransaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
     response.eth = {
-      transactionHash: trx.hash().toString('hex'),
+      transactionHash: trx.hash().toString(),
       transaction: trx,
       from: sender
     }
@@ -636,9 +635,9 @@ export class TelosEvmApi {
       data
     }
 
-    const tx = new Transaction(txData, { common: this.chainConfig })
+    const tx = new LegacyTransaction(txData, { common: this.chainConfig })
 
-    return tx.serialize().toString('hex')
+    return tx.serialize().toString()
   }
 
   private async getAbi(): Promise<ABI.Def> {

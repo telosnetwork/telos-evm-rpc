@@ -24,7 +24,7 @@ const logger = createLogger(`telos-evm-rpc`)
 export default class TelosEVMRPC {
     debug = false;
 
-    common: Common;
+    common: any;
     baseChain = 'mainnet';
     hardfork = Hardfork.London;
     fastify: FastifyInstance;
@@ -35,7 +35,7 @@ export default class TelosEVMRPC {
         this.config = config
         this.debug = config.debug
         if (config.chainId) {
-            this.common = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
+            this.common = new ethCommon.Common({ chain: Chain.Mainnet, hardfork: Hardfork.London, eips: [1559] });
         }
 
         this.fastify = fastify({
