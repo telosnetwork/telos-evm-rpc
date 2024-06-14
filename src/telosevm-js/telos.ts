@@ -106,7 +106,7 @@ export class TelosEvmApi {
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
     this.chainConfig = new Common({
-      chain: evmChainId,
+      chain: Chain.Mainnet,
       hardfork: Hardfork.London,
       eips: [1559]
     });
