@@ -642,10 +642,6 @@ export class TelosEvmApi {
         nonce,
         maxFeePerGas: `0x${(maxFeePerGas as any).toString(16)}`,
         maxPriorityFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`,
-        gasLimit:
-            gasLimit !== undefined
-                ? `0x${(gasLimit as any).toString(16)}`
-                : DEFAULT_GAS_LIMIT,
         value:
             value !== undefined
                 ? `0x${(value as any).toString(16)}`

@@ -837,8 +837,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			txParams.data = txParams.input;
 			delete txParams.input;
 		}
+		console.log(txParams);
 
-		const encodedTx = await fastify.evm.createEthTx({
+		const encodedTx : string = await fastify.evm.createEthTx({
 			...txParams,
 			sender: txParams.from,
 			gasPrice: 10000000000000000,
@@ -981,7 +982,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			value: _value.toHexString().replace(/^0x/, ''),
 			sender: txParams.from,
 		};
-		let tx = await fastify.evm.createEthTx(obj);
+		let tx : string = await fastify.evm.createEthTx(obj);
 		let sender = txParams.from
 
 		if (tx && isHexPrefixed(tx)) tx = tx.substring(2)
