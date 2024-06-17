@@ -178,6 +178,8 @@ export class TelosEvmApi {
     try {
       let transaction: AntelopeTransaction
       const abi = await this.getAbi()
+      console.log(trxVars);
+      console.log(actions);
 
       if (trxVars) {
         transaction = AntelopeTransaction.from({
@@ -198,6 +200,7 @@ export class TelosEvmApi {
         signatures: [signature],
       })
 
+      /* 
       const start = Date.now();
       const result = await api.v1.chain.send_transaction2(signed, {
         return_failure_trace: true,
@@ -205,7 +208,8 @@ export class TelosEvmApi {
         retry_trx_num_blocks: this.retryTrxNumBlocks
       })
       console.log(`send_transaction2 took ${Date.now() - start}ms`)
-      //const result = await api.v1.chain.send_transaction(signed);
+      */
+      const result = await api.v1.chain.send_transaction(signed);
       if (this.debug) {
         try {
           result.processed.action_traces.forEach((trace: any) => {
