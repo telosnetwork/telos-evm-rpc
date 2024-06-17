@@ -267,7 +267,6 @@ export class TelosEvmApi {
     if (this.debug) {
       console.log(`In raw, tx is: ${tx}`)
     }
-    console.log(`In raw, tx is: ${tx}`)
     let response: any = {}
     response.telos = await this.transact([
       {
@@ -286,7 +285,6 @@ export class TelosEvmApi {
     if (this.debug) {
       console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
     }
-    console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
 
     // EIP 1559 support
     let trx = (tx.startsWith('02')) ?
@@ -331,6 +329,10 @@ export class TelosEvmApi {
     if (tx && tx.startsWith('0x')) tx = tx.substring(2)
     if (sender && sender.startsWith('0x')) sender = sender.substring(2)
     if (!ram_payer) ram_payer = account
+
+    if(this.debug){
+      console.log(`In estimateGas, raw tx is: ${tx}`)
+    }
 
     try {
       const result = await this.transact([
