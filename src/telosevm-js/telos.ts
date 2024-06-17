@@ -1,5 +1,5 @@
 import { Account } from './interfaces'
-import { LegacyTransaction, FeeMarketEIP1559Transaction } from '@ethereumjs/tx'
+import { LegacyTransaction, FeeMarketEIP1559Transaction, Transaction } from '@ethereumjs/tx'
 import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
@@ -615,36 +615,63 @@ export class TelosEvmApi {
    * @returns {Promise<string>}RLP encoded transaction
    */
   async createEthTx({
-                      sender,
-                      data,
-                      gasLimit,
-                      value,
-                      to,
-                    }: {
+    sender,
+    data,
+    gasLimit,
+    value,
+    to,
+    maxFeePerGas,
+    maxPriorityFeePerGas
+  }: {
     sender?: string
     data?: string
     gasLimit?: string | Buffer
     value?: number | Buffer
     to?: string
+    maxFeePerGas?: string | Buffer
+    maxPriorityFeePerGas?: string | Buffer
   }) {
     const nonce = await this.getNonce(sender)
-    const gasPrice = await this.getGasPrice()
-    const txData = {
-      nonce,
-      gasPrice: `0x${gasPrice.toString(16)}`,
-      gasLimit:
-          gasLimit !== undefined
-              ? `0x${(gasLimit as any).toString(16)}`
-              : DEFAULT_GAS_LIMIT,
-      value:
-          value !== undefined
-              ? `0x${(value as any).toString(16)}`
-              : DEFAULT_VALUE,
-      to,
-      data
-    }
 
-    const tx = new LegacyTransaction(txData, { common: this.chainConfig })
+    console.log(`data: ${data}`)
+    console.log(`maxFeePerGas: ${maxFeePerGas}`)
+    console.log(`maxPriorityFeePerGas: ${maxPriorityFeePerGas}`)
+    let tx;
+    if(data.startsWith('02') || data.startsWith('0x02')){
+      const txData = {
+        nonce,
+        maxFeePerGas: `0x${(maxFeePerGas as any).toString(16)}`,
+        maxPriorityFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`,
+        gasLimit:
+            gasLimit !== undefined
+                ? `0x${(gasLimit as any).toString(16)}`
+                : DEFAULT_GAS_LIMIT,
+        value:
+            value !== undefined
+                ? `0x${(value as any).toString(16)}`
+                : DEFAULT_VALUE,
+        to,
+        data
+      }
+      tx = new FeeMarketEIP1559Transaction(txData, { common: this.chainConfig }) 
+    } else {
+      const gasPrice = await this.getGasPrice()
+      const txData = {
+        nonce,
+        gasPrice: `0x${gasPrice.toString(16)}`,
+        gasLimit:
+            gasLimit !== undefined
+                ? `0x${(gasLimit as any).toString(16)}`
+                : DEFAULT_GAS_LIMIT,
+        value:
+            value !== undefined
+                ? `0x${(value as any).toString(16)}`
+                : DEFAULT_VALUE,
+        to,
+        data
+      }
+      tx = new LegacyTransaction(txData, { common: this.chainConfig })
+    }
 
     return Array.from(tx.serialize()).map(byte => byte.toString(16)).join('');
   }
