@@ -673,7 +673,7 @@ export class TelosEvmApi {
       tx = new LegacyTransaction(txData, { common: this.chainConfig })
     }
 
-    return Array.from(tx.serialize()).map(byte => byte.toString(16)).join('');
+    return Array.from(tx.serialize()).map(byte => (byte as any).toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
