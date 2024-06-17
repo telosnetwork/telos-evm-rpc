@@ -267,7 +267,7 @@ export class TelosEvmApi {
     if (this.debug) {
       console.log(`In raw, tx is: ${tx}`)
     }
-
+    console.log(`In raw, tx is: ${tx}`)
     let response: any = {}
     response.telos = await this.transact([
       {
@@ -286,6 +286,7 @@ export class TelosEvmApi {
     if (this.debug) {
       console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
     }
+    console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
 
     // EIP 1559 support
     let trx = (tx.startsWith('02')) ?
