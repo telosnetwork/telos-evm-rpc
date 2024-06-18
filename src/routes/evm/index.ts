@@ -837,7 +837,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			txParams.data = txParams.input;
 			delete txParams.input;
 		}
-		console.log(txParams);
 
 		const encodedTx : string = await fastify.evm.createEthTx({
 			...txParams,

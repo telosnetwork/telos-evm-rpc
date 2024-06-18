@@ -1,5 +1,5 @@
 import { Account } from './interfaces'
-import { LegacyTransaction, FeeMarketEIP1559Transaction, Transaction } from '@ethereumjs/tx'
+import { Transaction, TransactionFactory } from '@ethereumjs/tx'
 import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
@@ -286,10 +286,7 @@ export class TelosEvmApi {
       console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
     }
 
-    // EIP 1559 support
-    let trx = (tx.startsWith('02')) ?
-      FeeMarketEIP1559Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig}) :
-      LegacyTransaction.fromSerializedTx(Buffer.from(tx, 'hex'), {common: this.chainConfig})
+    let trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
     response.eth = {
       transactionHash: Array.from(trx.hash()).map(byte => byte.toString(16).padStart(2, '0')).join(''),
@@ -631,14 +628,10 @@ export class TelosEvmApi {
     maxFeePerGas?: string | Buffer
     maxPriorityFeePerGas?: string | Buffer
   }) {
-    const nonce = await this.getNonce(sender)
-
-    console.log(`data: ${data}`)
-    console.log(`maxFeePerGas: ${maxFeePerGas}`)
-    console.log(`maxPriorityFeePerGas: ${maxPriorityFeePerGas}`)
-    let tx;
-    if(data.startsWith('02') || data.startsWith('0x02')){
-      const txData = {
+    const nonce = await this.getNonce(sender);
+    let txData;
+    if(maxFeePerGas || maxPriorityFeePerGas){
+      txData = {
         nonce,
         maxFeePerGas: `0x${(maxFeePerGas as any).toString(16)}`,
         maxPriorityFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`,
@@ -649,10 +642,9 @@ export class TelosEvmApi {
         to,
         data
       }
-      tx = new FeeMarketEIP1559Transaction(txData, { common: this.chainConfig }) 
     } else {
       const gasPrice = await this.getGasPrice()
-      const txData = {
+      txData = {
         nonce,
         gasPrice: `0x${gasPrice.toString(16)}`,
         gasLimit:
@@ -666,8 +658,8 @@ export class TelosEvmApi {
         to,
         data
       }
-      tx = new LegacyTransaction(txData, { common: this.chainConfig })
     }
+    const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
 
     return Array.from(tx.serialize()).map(byte => (byte as any).toString(16)).join('');
   }
