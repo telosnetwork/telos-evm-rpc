@@ -629,27 +629,11 @@ export class TelosEvmApi {
     maxPriorityFeePerGas?: string | Buffer
   }) {
     const nonce = await this.getNonce(sender);
-    let txData;
-    if(maxFeePerGas || maxPriorityFeePerGas){
-      txData = {
+    const gasPrice = await this.getGasPrice()
+    const txData = {
         nonce,
-        maxFeePerGas: `0x${(maxFeePerGas as any).toString(16)}`,
-        maxPriorityFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`,
-        gasLimit:
-            gasLimit !== undefined
-                ? `0x${(gasLimit as any).toString(16)}`
-                : DEFAULT_GAS_LIMIT,
-        value:
-            value !== undefined
-                ? `0x${(value as any).toString(16)}`
-                : DEFAULT_VALUE,
-        to,
-        data
-      }
-    } else {
-      const gasPrice = await this.getGasPrice()
-      txData = {
-        nonce,
+        maxFeePerGas: (maxFeePerGas) ? `0x${(maxFeePerGas as any).toString(16)}` : '0x',
+        maxPriorityFeePerGas: (maxPriorityFeePerGas) ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : '0x',
         gasPrice: `0x${gasPrice.toString(16)}`,
         gasLimit:
             gasLimit !== undefined
@@ -661,7 +645,6 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to,
         data
-      }
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
