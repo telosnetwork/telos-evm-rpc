@@ -13,6 +13,7 @@ import {
   Transaction as AntelopeTransaction,
   SignedTransaction,
   Action, ABI,
+  UInt8,
 } from "@wharfkit/antelope"
 
 const BN = require('bn.js')
@@ -655,14 +656,21 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: (maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined) ? '0x2' : '0x0'
+        type: (maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined) ? 2 : 0
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     console.log(tx.toJSON());
-    const message = tx.getMessageToSign()
-    const serializedMessage = RLP.encode(message);
-    return serializedMessage.map(byte => (byte as any).toString(16)).join('');
+    const message = tx.getMessageToSign();
+    console.log('Valid ' + tx.isValid())
+    console.log((tx.serialize()).map(byte => (byte as any).toString(16)).join(''));
+    console.log(message);
+    console.log(message.map(byte => byte.toString(16)).join(''));
+    if((maxFeePerGas === undefined && maxPriorityFeePerGas === undefined)){
+      const serializedMessage = RLP.encode(message);
+      return serializedMessage.map(byte => (byte as any).toString(16)).join('');
+    }
+    return message.map(byte => byte.toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
