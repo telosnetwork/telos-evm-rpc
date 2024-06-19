@@ -632,8 +632,14 @@ export class TelosEvmApi {
     const gasPrice = await this.getGasPrice()
     const txData = {
         nonce,
-        maxFeePerGas: (maxFeePerGas) ? `0x${(maxFeePerGas as any).toString(16)}` : '0x',
-        maxPriorityFeePerGas: (maxPriorityFeePerGas) ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : '0x',
+        maxFeePerGas: 
+          maxFeePerGas !== undefined
+              ? `0x${(maxFeePerGas as any).toString(16)}`
+              : DEFAULT_VALUE,
+        maxPriorityFeePerGas: 
+            maxPriorityFeePerGas !== undefined
+                ? `0x${(maxPriorityFeePerGas as any).toString(16)}`
+                : DEFAULT_VALUE,
         gasPrice: `0x${gasPrice.toString(16)}`,
         gasLimit:
             gasLimit !== undefined
