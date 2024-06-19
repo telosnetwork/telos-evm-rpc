@@ -658,7 +658,8 @@ export class TelosEvmApi {
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-
+    console.log(tx.toJSON());
+    console.log(tx.raw);
     return Array.from(tx.serialize()).map(byte => byte.toString(16)).join('');
   }
 
