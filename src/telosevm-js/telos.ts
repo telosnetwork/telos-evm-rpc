@@ -1,5 +1,6 @@
 import { Account } from './interfaces'
 import { Transaction, TransactionFactory } from '@ethereumjs/tx'
+import { RLP } from '@ethereumjs/rlp'
 import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
@@ -654,13 +655,14 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: (maxFeePerGas !== undefined && maxPriorityFeePerGas !== undefined) ? '0x2' : '0x0'
+        type: (maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined) ? '0x2' : '0x0'
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     console.log(tx.toJSON());
-    console.log(tx.raw);
-    return Array.from(tx.serialize()).map(byte => byte.toString(16)).join('');
+    const message = tx.getMessageToSign()
+    const serializedMessage = RLP.encode(message);
+    return serializedMessage.map(byte => (byte as any).toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
