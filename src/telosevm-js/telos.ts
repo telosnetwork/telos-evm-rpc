@@ -1,5 +1,5 @@
 import { Account } from './interfaces'
-import { Transaction, TransactionFactory } from '@ethereumjs/tx'
+import { LegacyTransaction, Transaction, TransactionFactory } from '@ethereumjs/tx'
 import { RLP } from '@ethereumjs/rlp'
 import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
@@ -665,17 +665,13 @@ export class TelosEvmApi {
       txData.accessList = accessList || [];
     }
     console.log("Building tx with data: ", txData);
-    const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-    console.log(tx.toJSON());
-    const message = tx.getMessageToSign();
-    console.log('Valid ' + tx.isValid())
-    console.log((tx.serialize()).map(byte => (byte as any).toString(16)).join(''));
-    console.log(message);
-    console.log(message.map(byte => byte.toString(16)).join(''));
-    if((maxFeePerGas === undefined && maxPriorityFeePerGas === undefined)){
-      const serializedMessage = RLP.encode(message);
-      return serializedMessage.map(byte => (byte as any).toString(16)).join('');
+    if(txData.type === undefined){
+      const tx = LegacyTransaction.fromTxData(txData, {common: this.chainConfig});
+      console.log(tx.toJSON());
+      return (tx.serialize()).map(byte => (byte as any).toString(16)).join('');
     }
+    const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
+    const message = tx.getMessageToSign();
     return message.map(byte => byte.toString(16)).join('');
   }
 
