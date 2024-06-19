@@ -650,7 +650,7 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: undefined
+        type: 1
     }
     if(maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined){
       txData.type = 2;
@@ -665,13 +665,6 @@ export class TelosEvmApi {
       txData.accessList = accessList || [];
     }
     console.log("Building tx with data: ", txData);
-    if(txData.type === undefined){
-      delete txData.type;
-      const tx = LegacyTransaction.fromTxData(txData, {common: this.chainConfig});
-      console.log(tx.toJSON());
-      const message = RLP.encode(tx.getMessageToSign());
-      return message.map(byte => (byte as any).toString(16)).join('');
-    }
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     const message = tx.getMessageToSign();
     return message.map(byte => byte.toString(16)).join('');
