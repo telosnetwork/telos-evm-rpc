@@ -636,16 +636,10 @@ export class TelosEvmApi {
     const gasPrice = await this.getGasPrice()
     const txData = {
         nonce: nonce,
-        maxFeePerGas: 
-          maxFeePerGas !== undefined
-              ? `0x${(maxFeePerGas as any).toString(16)}`
-              : DEFAULT_VALUE,
-        maxPriorityFeePerGas: 
-            maxPriorityFeePerGas !== undefined
-                ? `0x${(maxPriorityFeePerGas as any).toString(16)}`
-                : DEFAULT_VALUE,
+        maxFeePerGas: undefined,
+        maxPriorityFeePerGas: undefined,
+        accessList: undefined,
         gasPrice: `0x${gasPrice.toString(16)}`,
-        accessList: accessList || [],
         gasLimit:
             gasLimit !== undefined
                 ? `0x${(gasLimit as any).toString(16)}`
@@ -656,7 +650,19 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: (maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined) ? 2 : 0
+        type: undefined
+    }
+    if(maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined){
+      txData.type = 2;
+      txData.maxFeePerGas = maxFeePerGas !== undefined
+          ? `0x${(maxFeePerGas as any).toString(16)}`
+          : DEFAULT_VALUE
+      ;
+      txData.maxPriorityFeePerGas = maxPriorityFeePerGas !== undefined
+          ? `0x${(maxPriorityFeePerGas as any).toString(16)}`
+          : DEFAULT_VALUE
+      ;
+      txData.accessList = accessList || [];
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
