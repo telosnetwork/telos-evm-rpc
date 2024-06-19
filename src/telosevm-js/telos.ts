@@ -669,7 +669,8 @@ export class TelosEvmApi {
       delete txData.type;
       const tx = LegacyTransaction.fromTxData(txData, {common: this.chainConfig});
       console.log(tx.toJSON());
-      return (tx.serialize()).map(byte => (byte as any).toString(16)).join('');
+      const message = RLP.encode(tx.getMessageToSign());
+      return message.map(byte => (byte as any).toString(16)).join('');
     }
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     const message = tx.getMessageToSign();
