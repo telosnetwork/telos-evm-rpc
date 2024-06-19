@@ -633,7 +633,7 @@ export class TelosEvmApi {
     const nonce = await this.getNonce(sender);
     const gasPrice = await this.getGasPrice()
     const txData = {
-        nonce,
+        nonce: nonce,
         maxFeePerGas: 
           maxFeePerGas !== undefined
               ? `0x${(maxFeePerGas as any).toString(16)}`
@@ -652,8 +652,9 @@ export class TelosEvmApi {
             value !== undefined
                 ? `0x${(value as any).toString(16)}`
                 : DEFAULT_VALUE,
-        to,
-        data
+        to: to,
+        data: data,
+        type: (maxFeePerGas || maxPriorityFeePerGas) ? '0x2' : '0x1'
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
