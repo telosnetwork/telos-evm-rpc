@@ -654,7 +654,7 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: (maxFeePerGas || maxPriorityFeePerGas) ? '0x2' : '0x1'
+        type: (maxFeePerGas !== undefined && maxPriorityFeePerGas !== undefined) ? '0x2' : '0x0'
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
