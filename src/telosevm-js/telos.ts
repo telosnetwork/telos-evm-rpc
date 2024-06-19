@@ -650,10 +650,10 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: 1
+        type: '0x01'
     }
     if(maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined){
-      txData.type = 2;
+      txData.type = '0x02';
       txData.maxFeePerGas = maxFeePerGas !== undefined
           ? `0x${(maxFeePerGas as any).toString(16)}`
           : DEFAULT_VALUE
