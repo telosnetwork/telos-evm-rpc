@@ -666,8 +666,8 @@ export class TelosEvmApi {
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-    const message = tx.getMessageToSign();
-    return message.map(byte => byte.toString(16)).join('');
+    const message = tx.serialize();
+    return message.map(byte => (byte as any).toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
