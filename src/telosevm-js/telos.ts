@@ -666,6 +666,7 @@ export class TelosEvmApi {
     }
     console.log("Building tx with data: ", txData);
     if(txData.type === undefined){
+      delete txData.type;
       const tx = LegacyTransaction.fromTxData(txData, {common: this.chainConfig});
       console.log(tx.toJSON());
       return (tx.serialize()).map(byte => (byte as any).toString(16)).join('');
