@@ -617,6 +617,7 @@ export class TelosEvmApi {
     gasLimit,
     value,
     to,
+    accessList,
     maxFeePerGas,
     maxPriorityFeePerGas
   }: {
@@ -625,6 +626,7 @@ export class TelosEvmApi {
     gasLimit?: string | Buffer
     value?: number | Buffer
     to?: string
+    accessList?: any[]
     maxFeePerGas?: string | Buffer
     maxPriorityFeePerGas?: string | Buffer
   }) {
@@ -641,6 +643,7 @@ export class TelosEvmApi {
                 ? `0x${(maxPriorityFeePerGas as any).toString(16)}`
                 : DEFAULT_VALUE,
         gasPrice: `0x${gasPrice.toString(16)}`,
+        accessList: accessList || [],
         gasLimit:
             gasLimit !== undefined
                 ? `0x${(gasLimit as any).toString(16)}`
