@@ -15,7 +15,7 @@ import {
   Action, ABI,
   UInt8,
 } from "@wharfkit/antelope"
-import { numToHex, uInt8ArrayArrayHexArray } from '../util/utils';
+import { numToHex } from '../util/utils';
 
 const BN = require('bn.js')
 
@@ -648,6 +648,9 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
+        maxFeePerGas: maxFeePerGas ? `0x${(maxFeePerGas as any).toString(16)}` : undefined,
+        maxPriorityFeePerGas: maxPriorityFeePerGas ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : undefined,
+        accessList: accessList ? accessList : undefined,
     }
     
     console.log('txData: ', txData);
