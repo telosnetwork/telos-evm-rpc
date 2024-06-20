@@ -667,6 +667,7 @@ export class TelosEvmApi {
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     let message = tx.getMessageToSign();
     if(isLegacyTx(tx)){
+      console.log('legacy tx');
       message = RLP.encode(message);
     }
     return message.map(byte => byte.toString(16)).join('');
