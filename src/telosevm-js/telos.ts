@@ -666,9 +666,9 @@ export class TelosEvmApi {
     }
     console.log("Building tx with data: ", txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-    console.log(tx.getHashedMessageToSign().map(byte => (byte as any).toString(16)).join(''));
+    console.log(tx.raw().map(byte => byte.toString(16)).join(''));
     console.log(tx.toJSON());
-    const message = tx.serialize();
+    const message = tx.raw();
     return message.map(byte => (byte as any).toString(16)).join('');
   }
 
