@@ -636,9 +636,6 @@ export class TelosEvmApi {
     const gasPrice = await this.getGasPrice()
     const txData = {
         nonce: nonce,
-        maxFeePerGas: undefined,
-        maxPriorityFeePerGas: undefined,
-        accessList: undefined,
         gasPrice: `0x${gasPrice.toString(16)}`,
         gasLimit:
             gasLimit !== undefined
@@ -650,19 +647,6 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
-        type: undefined
-    }
-    if(maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined){
-      txData.type = '0x02';
-      txData.maxFeePerGas = maxFeePerGas !== undefined
-          ? `0x${(maxFeePerGas as any).toString(16)}`
-          : DEFAULT_VALUE
-      ;
-      txData.maxPriorityFeePerGas = maxPriorityFeePerGas !== undefined
-          ? `0x${(maxPriorityFeePerGas as any).toString(16)}`
-          : DEFAULT_VALUE
-      ;
-      txData.accessList = accessList || [];
     }
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     let message = tx.getMessageToSign();
