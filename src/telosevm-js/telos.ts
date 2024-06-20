@@ -1,5 +1,5 @@
 import { Account } from './interfaces'
-import { LegacyTransaction, Transaction, TransactionFactory } from '@ethereumjs/tx'
+import { LegacyTransaction, Transaction, TransactionFactory, isLegacyTx } from '@ethereumjs/tx'
 import { RLP } from '@ethereumjs/rlp'
 import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
@@ -666,7 +666,7 @@ export class TelosEvmApi {
     }
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     let message = tx.getMessageToSign();
-    if(tx.type === 0){
+    if(isLegacyTx(tx)){
       message = RLP.encode(message);
     }
     return (message as any).toString('hex');
