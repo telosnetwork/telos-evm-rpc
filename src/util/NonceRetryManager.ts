@@ -2,7 +2,6 @@ import { FeeMarketEIP1559Transaction, LegacyTransaction } from "@ethereumjs/tx"
 import {TelosEvmConfig} from "../types";
 import {FastifyInstance} from "fastify";
 import {addHexPrefix} from "@ethereumjs/util";
-import * as ws from "ws";
 import {TelosEvmApi} from "../telosevm-js/telos";
 
 interface FailedTrx {

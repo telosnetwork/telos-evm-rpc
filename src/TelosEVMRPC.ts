@@ -35,10 +35,9 @@ export default class TelosEVMRPC {
         this.config = config
         this.debug = config.debug
         if (config.chainId) {
-            this.common = new Common({
-                chain: Chain.Mainnet,
-                hardfork: Hardfork.London,
-                eips: [1559]
+            this.common = Common.custom({chainId: config.chainId}, {
+              hardfork: Hardfork.London,
+              eips: [1559]
             });
         }
 

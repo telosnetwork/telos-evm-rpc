@@ -1,7 +1,7 @@
 import { Account } from './interfaces'
 import { LegacyTransaction, Transaction, TransactionFactory, isLegacyTx } from '@ethereumjs/tx'
 import { RLP } from '@ethereumjs/rlp'
-import {Chain, Common, Hardfork} from '@ethereumjs/common';
+import {Chain, Common, CustomChain, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -108,8 +108,7 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = new Common({
-      chain: Chain.Mainnet,
+    this.chainConfig = Common.custom({chainId: evmChainId}, {
       hardfork: Hardfork.London,
       eips: [1559]
     });
@@ -292,7 +291,7 @@ export class TelosEvmApi {
     let trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig})
 
     response.eth = {
-      transactionHash: Array.from(trx.hash()).map(byte => byte.toString(16).padStart(2, '0')).join(''),
+      transactionHash: numToHex(trx.hash()),
       transaction: trx,
       from: sender
     }
