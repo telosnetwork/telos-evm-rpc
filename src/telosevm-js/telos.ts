@@ -648,13 +648,17 @@ export class TelosEvmApi {
         to: to,
         data: data,
     }
+    
+    console.log('txData: ', txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
+    console.log('tx: ', tx);
     let message = tx.getMessageToSign();
+    console.log('message: ', message);
     if(isLegacyTx(tx)){
-      console.log('legacy tx');
+      console.log('legacy tx detected');
       message = RLP.encode(message);
     }
-    return message.map(byte => byte.toString('hex')).join('');
+    return message.map(byte => byte.toString(16)).join('');
   }
 
   private async getAbi(): Promise<ABI.Def> {
