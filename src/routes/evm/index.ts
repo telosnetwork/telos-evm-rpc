@@ -25,11 +25,12 @@ import {
 	PrivateKey,
 	SignedTransaction,
 	Struct,
-	Transaction, Bytes, Checksum160
+	Transaction as NativeTransaction, Bytes, Checksum160
 } from '@wharfkit/antelope'
 import NonceRetryManager from "../../util/NonceRetryManager";
 import {TransactionVars} from "../../telosevm-js/telos";
 import {estypes} from "@elastic/elasticsearch";
+import { EIP2718CompatibleTx, LegacyTransaction, Transaction } from "@ethereumjs/tx";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -838,7 +839,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			delete txParams.input;
 		}
 
-		const encodedTx : string = await fastify.evm.createEthTx({
+		const encodedTx : EIP2718CompatibleTx | LegacyTransaction = await fastify.evm.createEthTx({
 			...txParams,
 			sender: txParams.from,
 			gasPrice: 10000000000000000,
@@ -1007,7 +1008,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		try {
 			const info = await getInfo()
-			const transaction = Transaction.from({
+			const transaction = NativeTransaction.from({
 				...info.getTransactionHeader(120),
 				actions: [
 					action

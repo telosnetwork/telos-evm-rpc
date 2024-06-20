@@ -665,9 +665,11 @@ export class TelosEvmApi {
       txData.accessList = accessList || [];
     }
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-    console.log(tx.toJSON());
-    const message = tx.serialize();
-    return message.map(byte => (byte as any).toString(16)).join('');
+    let message = tx.getMessageToSign();
+    if(tx.type === 0){
+      message = RLP.encode(message);
+    }
+    return (message as any).toString('hex');
   }
 
   private async getAbi(): Promise<ABI.Def> {
