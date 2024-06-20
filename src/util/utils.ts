@@ -94,12 +94,25 @@ const BLOCK_TEMPLATE =
 
 export { BLOCK_TEMPLATE, NEW_HEADS_TEMPLATE, EMPTY_LOGS }
 
-export function numToHex(input: number | string) {
+export function numToHex(input: number | string | Uint8Array | Uint8Array[]) : string {
     if (typeof input === 'number') {
         return '0x' + input.toString(16)
-    } else {
+    } else if (typeof input === 'string') {
         return '0x' + new BN(input).toString(16)
+    } else if (input instanceof Uint8Array) {
+        return uInt8ArraytoHex(input);
+    } else if (Array.isArray(input)) {
+        return uInt8ArrayArrayHexArray(input);
     }
+}
+export function uInt8ArraytoHex(uint8Array: Uint8Array) {
+    return Array.from(uint8Array)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+export function uInt8ArrayArrayHexArray(uint8ArrayArray :  Uint8Array[]) {
+    return uint8ArrayArray.map(uInt8ArraytoHex).join('');
 }
 
 export function toLowerCaseAddress(address) {

@@ -15,6 +15,7 @@ import {
   Action, ABI,
   UInt8,
 } from "@wharfkit/antelope"
+import { numToHex, uInt8ArrayArrayHexArray } from '../util/utils';
 
 const BN = require('bn.js')
 
@@ -652,13 +653,13 @@ export class TelosEvmApi {
     console.log('txData: ', txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     console.log('tx: ', tx);
-    let message = tx.getMessageToSign();
+    let message : Uint8Array[] | Uint8Array = tx.getMessageToSign();
     console.log('message: ', message);
     if(isLegacyTx(tx)){
       console.log('legacy tx detected');
       message = RLP.encode(message);
     }
-    return message.map(byte => byte.toString(16)).join('');
+    return numToHex(message);
   }
 
   private async getAbi(): Promise<ABI.Def> {
