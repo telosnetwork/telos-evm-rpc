@@ -669,7 +669,7 @@ export class TelosEvmApi {
     if(isLegacyTx(tx)){
       message = RLP.encode(message);
     }
-    return (message as any).toString('hex');
+    return (message).map(byte => byte.toString(16).join(''));
   }
 
   private async getAbi(): Promise<ABI.Def> {
