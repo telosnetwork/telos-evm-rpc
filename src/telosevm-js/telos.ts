@@ -1,7 +1,7 @@
 import { Account } from './interfaces'
-import { LegacyTransaction, Transaction, TransactionFactory, isLegacyTx } from '@ethereumjs/tx'
+import { TransactionFactory, isLegacyTx } from '@ethereumjs/tx'
 import { RLP } from '@ethereumjs/rlp'
-import {Chain, Common, CustomChain, Hardfork} from '@ethereumjs/common';
+import { Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -13,7 +13,6 @@ import {
   Transaction as AntelopeTransaction,
   SignedTransaction,
   Action, ABI,
-  UInt8,
 } from "@wharfkit/antelope"
 import { numToHex } from '../util/utils';
 

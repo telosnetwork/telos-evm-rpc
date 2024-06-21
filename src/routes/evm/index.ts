@@ -13,8 +13,6 @@ import {
 	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed,
 	parsePanicReason, parseRevertReason, toOpname,
-	transactionFromReceipt
-
 } from "../../util/utils"
 import MyLogger from "../../logging";
 import moment from "moment";
@@ -1133,7 +1131,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					else
 						err.errorMessage = `VM Exception while processing transaction: ${receipt?.errors[0]}`;
 				}
-
 				err.data = {
 					txHash: addHexPrefix(rawResponse.eth.transactionHash)
 				};
@@ -1188,10 +1185,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (receipt['logsBloom']) {
 				_logsBloom = addHexPrefix(receipt['logsBloom']);
 			}
-			let effectiveGasPrice = '0x0';
-			if(receipt['charged_gas_price']){
-				effectiveGasPrice = removeLeftZeros(numToHex(receipt['charged_gas_price']))
-			}
 		
 			let data = {
 				blockHash: _blockHash,
@@ -1215,27 +1208,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
+			if(receipt['charged_gas_price']){
+				data = Object.assign({
+					effectiveGasPrice: receipt['charged_gas_price']
+				}, data, {})
+			}
 			// EIP 2718
 			if(receipt['type']){
 				data = Object.assign({
 					type: receipt['type']
-				}, data, {})
-			}
-			// EIP 2930
-			if(receipt['access_list']){
-				data = Object.assign({
-					accessList: receipt['access_list']
-				}, data, {})
-			}
-			// EIP 1559
-			if(receipt['max_fee_per_gas']){
-				data = Object.assign({
-					maxFeePerGas: receipt['max_fee_per_gas']
-				}, data, {})
-			}
-			if(receipt['max_priority_fee_per_gas']){
-				data = Object.assign({
-					maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 				}, data, {})
 			}
 			console.debug("DATA FROM RECEIPT");
@@ -1250,11 +1231,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a transaction for a given hash.
 	 */
 	methods.set('eth_getTransactionByHash', async ([trxHash, client]) => {
+		console.debug(`eth_getTransactionByHash called for ${trxHash}`);
 		// lookup raw action
 		const receiptAction = await searchActionByHash(trxHash, client);
 		if (!receiptAction) return null;
 		const {v, r, s} = await getVRS(receiptAction);
 		const receipt = receiptAction['@raw'];
+		console.debug(receipt);
 
 		const _blockHash = addHexPrefix(receipt['block_hash']);
 		const _blockNum = numToHex(receipt['block']);
@@ -1280,6 +1263,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if(receipt['access_list']){
 			data = Object.assign({
 				accessList: receipt['access_list']
+			}, data, {})
+		}
+		if(receipt['chain_id']){
+			data = Object.assign({
+				chainId: receipt['chain_id']
 			}, data, {})
 		}
 		if(receipt.charged_gas_price){
