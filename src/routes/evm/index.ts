@@ -395,6 +395,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
+				console.debug(receipt);
 
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
@@ -416,18 +417,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					const hexNonce = removeLeftZeros(numToHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(numToHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
-					// IEP 1559
-					const maxPriorityFee = removeLeftZeros(numToHex(receipt['max_priority_fee_per_gas']));
-					const maxFee = removeLeftZeros(numToHex(receipt['max_fee_per_gas']));
-
-					trxs.push({
+					// Legacy
+					const data = {
 						blockHash: blockHash,
 						blockNumber: hexBlockNum,
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
-						maxFeePerGas: maxFee,
-						maxPriorityFeePerGas: maxPriorityFee,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -435,7 +431,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						transactionIndex: hexTransactionIndex,
 						value: hexValue,
 						v, r, s
-					});
+					} as any;
+					// EIP 1559
+					if(receipt['base_fee_per_gas']){
+						data.baseFeePerGas = removeLeftZeros(numToHex(receipt['base_fee_per_gas']));
+					}
+
+					trxs.push();
 				}
 			}
 
@@ -1133,6 +1135,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const receiptAction = await searchActionByHash(trxHash, client);
 			if (!receiptAction) return null;
 			const receipt = receiptAction['@raw'];
+			console.debug(receipt);
 
 			//Logger.debug(`get transaction receipt got ${JSON.stringify(receipt)}`)
 			const _blockHash = addHexPrefix(receipt['block_hash']);
@@ -1147,7 +1150,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				_logsBloom = addHexPrefix(receipt['logsBloom']);
 			}
 
-			return {
+			const data : any = {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
@@ -1168,7 +1171,22 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				),
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
-			};
+			}
+			// EIP 2718
+			if(receipt['type']){
+				data.type = receipt['type'];
+			}
+			// EIP 2930
+			if(receipt['access_list']){
+				data.accessList = receipt['access_list'];
+			}
+			// EIP 1559
+			if(receipt['max_fee_per_gas']){
+				data.maxFeePerGas = receipt['max_fee_per_gas'];
+			}
+			if(receipt['max_priority_fee_per_gas']){
+				data.maxPriorityFeePerGas = receipt['max_priority_fee_per_gas'];
+			}
 		} else {
 			return null;
 		}
