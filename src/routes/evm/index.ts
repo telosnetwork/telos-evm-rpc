@@ -858,6 +858,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * allow the transaction to complete.
 	 */
 	methods.set('eth_estimateGas', async ([txParams, block]) => {
+		console.debug("eth_estimateGas called");
 		if (txParams.hasOwnProperty('value')) {
 			// If value is not 0 check there is an account first
 			if(txParams.value > 0){
@@ -1006,6 +1007,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * transaction on the block chain.
 	 */
 	methods.set('eth_call', async ([txParams]) => {
+		console.debug("eth_call called");
 		let _value = ethers.BigNumber.from(0);
 		if (txParams.value) {
 			_value = ethers.BigNumber.from(txParams.value);
@@ -1103,6 +1105,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Ethereum network.
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
+		console.debug("eth_sendRawTransaction called");
 		try {
 			const rawResponse = await fastify.evm.raw({
 				account: opts.signerAccount,
@@ -1160,6 +1163,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the receipt of a transaction by transaction hash.
 	 */
 	methods.set('eth_getTransactionReceipt', async ([trxHash, client]) => {
+		console.debug("eth_getTransactionReceipt called");
 		if (trxHash) {
 
 			// lookup receipt delta
@@ -1234,6 +1238,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 				}, data, {})
 			}
+			console.debug("DATA FROM RECEIPT");
+			console.debug(data);
 			return data;
 		} else {
 			return null;
