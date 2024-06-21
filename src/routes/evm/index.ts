@@ -1163,7 +1163,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the receipt of a transaction by transaction hash.
 	 */
 	methods.set('eth_getTransactionReceipt', async ([trxHash, client]) => {
-		console.debug("eth_getTransactionReceipt called");
+		console.debug("eth_getTransactionReceipt called for " + trxHash);
 		if (trxHash) {
 
 			// lookup receipt delta
@@ -1188,13 +1188,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (receipt['logsBloom']) {
 				_logsBloom = addHexPrefix(receipt['logsBloom']);
 			}
+			let effectiveGasPrice = '0x0';
+			if(receipt['charged_gas_price']){
+				effectiveGasPrice = removeLeftZeros(numToHex(receipt['charged_gas_price']))
+			}
 		
 			let data = {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: removeLeftZeros(_gas),
-				effectiveGasPrice: removeLeftZeros(numToHex(receipt['gasprice'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
@@ -1217,9 +1220,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				data = Object.assign({
 					type: receipt['type']
 				}, data, {})
-				if(receipt['type'] === 2){
-					data.effectiveGasPrice = removeLeftZeros(numToHex(receipt['charged_gas_price']));
-				}
 			}
 			// EIP 2930
 			if(receipt['access_list']){
