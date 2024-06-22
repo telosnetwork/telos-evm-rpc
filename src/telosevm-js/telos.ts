@@ -14,7 +14,7 @@ import {
   SignedTransaction,
   Action, ABI,
 } from "@wharfkit/antelope"
-import { numToHex } from '../util/utils';
+import { toHex } from '../util/utils';
 
 const BN = require('bn.js')
 
@@ -288,9 +288,12 @@ export class TelosEvmApi {
     }
 
     let trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig})
-
-    response.eth = {
-      transactionHash: numToHex(trx.hash()),
+    
+    if (this.debug) {
+      console.log(`Transaction hash is: ${trx.hash()}`)
+    }
+    response.telos = {
+      transactionHash: toHex(trx.hash()),
       transaction: trx,
       from: sender
     }
@@ -660,10 +663,9 @@ export class TelosEvmApi {
     let message : Uint8Array[] | Uint8Array = tx.getMessageToSign();
     console.log('message: ', message);
     if(isLegacyTx(tx)){
-      console.log('legacy tx detected');
       message = RLP.encode(message);
     }
-    return numToHex(message);
+    return toHex(message);
   }
 
   private async getAbi(): Promise<ABI.Def> {

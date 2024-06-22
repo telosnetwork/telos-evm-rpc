@@ -1132,12 +1132,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						err.errorMessage = `VM Exception while processing transaction: ${receipt?.errors[0]}`;
 				}
 				err.data = {
-					txHash: addHexPrefix(rawResponse.eth.transactionHash)
+					txHash: addHexPrefix(rawResponse.telos.transactionHash)
 				};
 				throw err;
 			}
 
-			return addHexPrefix(rawResponse.eth.transactionHash);
+			return addHexPrefix(rawResponse.telos.transactionHash);
 		} catch (e) {
 			if (opts.orderNonces) {
 				const assertionMessage = e?.response?.json?.error?.details[0]?.message
