@@ -94,7 +94,7 @@ const BLOCK_TEMPLATE =
 
 export { BLOCK_TEMPLATE, NEW_HEADS_TEMPLATE, EMPTY_LOGS }
 
-export function numToHex(input: number | string | Uint8Array | Uint8Array[]) : string {
+export function toHex(input: number | string | Uint8Array | Uint8Array[]) : string {
     if (typeof input === 'number') {
         return '0x' + input.toString(16)
     } else if (typeof input === 'string') {
@@ -104,70 +104,9 @@ export function numToHex(input: number | string | Uint8Array | Uint8Array[]) : s
         .map(byte => byte.toString(16).padStart(2, '0'))
         .join('');
     } else if (Array.isArray(input)) {
-        return input.map(numToHex).join('');
+        return input.map(toHex).join('');
     }
-}
-
-export function transactionFromReceipt(receipt){
-    const _blockHash = addHexPrefix(receipt['block_hash']);
-    const _blockNum = numToHex(receipt['block']);
-    const _gas = numToHex(receipt['gasused']);
-    let _contractAddr = null;
-    if (receipt['createdaddr']) {
-        _contractAddr = addHexPrefix(receipt['createdaddr']);
-    }
-    let _logsBloom = EMPTY_LOGS;
-    if (receipt['logsBloom']) {
-        _logsBloom = addHexPrefix(receipt['logsBloom']);
-    }
-
-    let data = {
-        blockHash: _blockHash,
-        blockNumber: removeLeftZeros(numToHex(receipt['block'])),
-        contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
-        cumulativeGasUsed: removeLeftZeros(_gas),
-        from: toChecksumAddress(receipt['from'])?.toLowerCase(),
-        gasUsed: removeLeftZeros(_gas),
-        logsBloom: _logsBloom,
-        status: removeLeftZeros(numToHex(receipt['status'])),
-        to: toChecksumAddress(receipt['to'])?.toLowerCase(),
-        transactionHash: receipt['hash'],
-        transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
-        logs: buildLogsObject(
-            receipt['logs'],
-            _blockHash,
-            _blockNum,
-            receipt['hash'],
-            numToHex(receipt['trx_index'])
-        ),
-        //errors: receipt['errors'],
-        //output: '0x' + receipt['output']
-    }
-    // EIP 2718
-    if(receipt['type']){
-        data = Object.assign({
-            type: receipt['type']
-        }, data, {})
-    }
-    // EIP 2930
-    if(receipt['access_list']){
-        data = Object.assign({
-            accessList: receipt['access_list']
-        }, data, {})
-    }
-    // EIP 1559
-    if(receipt['max_fee_per_gas']){
-        data = Object.assign({
-            maxFeePerGas: receipt['max_fee_per_gas']
-        }, data, {})
-    }
-    if(receipt['max_priority_fee_per_gas']){
-        data = Object.assign({
-            maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
-        }, data, {})
-    }
-    return data;
-}
+} 
 
 export function toLowerCaseAddress(address) {
     if (!address)
@@ -215,7 +154,7 @@ export function buildLogsObject(logs: any[], blHash: string, blNumber: string, t
                 blockHash: blHash,
                 blockNumber: blNumber,
                 data: "0x" + log.data,
-                logIndex: numToHex(counter),
+                logIndex: toHex(counter),
                 removed: false,
                 topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
                 transactionHash: txHash,
@@ -302,12 +241,12 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
     let baseLogObj = {
         address: toChecksumAddress('0x' + log.address),
         blockHash: '0x' + rawActionDocument['@raw']['block_hash'],
-        blockNumber: numToHex(rawActionDocument['@raw']['block']),
+        blockNumber: toHex(rawActionDocument['@raw']['block']),
         data: '0x' + log.data,
-        logIndex: numToHex(log.logIndex),
+        logIndex: toHex(log.logIndex),
         topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
         transactionHash: trx,
-        transactionIndex: numToHex(rawActionDocument['@raw']['trx_index'])
+        transactionIndex: toHex(rawActionDocument['@raw']['trx_index'])
     }
 
     if (forSubscription)
