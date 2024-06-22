@@ -292,11 +292,12 @@ export class TelosEvmApi {
     if (this.debug) {
       console.log(`Transaction hash is: ${trx.hash()}`)
     }
-    response.telos = {
+
+    response = Object.assign({
       transactionHash: toHex(trx.hash()),
       transaction: trx,
       from: sender
-    }
+    }, response);
 
     return response
   }
