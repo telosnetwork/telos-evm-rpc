@@ -620,7 +620,8 @@ export class TelosEvmApi {
     to,
     accessList,
     maxFeePerGas,
-    maxPriorityFeePerGas
+    maxPriorityFeePerGas,
+    chainId
   }: {
     sender?: string
     data?: string
@@ -629,7 +630,8 @@ export class TelosEvmApi {
     to?: string
     accessList?: any[]
     maxFeePerGas?: string | Buffer
-    maxPriorityFeePerGas?: string | Buffer
+    maxPriorityFeePerGas?: string | Buffer,
+    chainId?: number | string | Buffer
   }) {
     const nonce = await this.getNonce(sender);
     const gasPrice = await this.getGasPrice()
@@ -649,6 +651,7 @@ export class TelosEvmApi {
         maxFeePerGas: maxFeePerGas ? `0x${(maxFeePerGas as any).toString(16)}` : undefined,
         maxPriorityFeePerGas: maxPriorityFeePerGas ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : undefined,
         accessList: accessList ? accessList : undefined,
+        chainId: chainId ? chainId : undefined
     }
     
     console.log('txData: ', txData);
