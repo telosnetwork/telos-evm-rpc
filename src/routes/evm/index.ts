@@ -3,7 +3,7 @@ import {TelosEvmConfig} from "../../types";
 import Bloom from "../../bloom";
 import {
 	toChecksumAddress,
-	numToHex,
+	toHex,
 	removeZeroHexFromFilter,
 	buildLogsObject,
 	logFilterMatch,
@@ -330,7 +330,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
-		const baseFeePerGas = removeLeftZeros(numToHex(blockDelta['@baseFeePerGas']));
+		const baseFeePerGas = removeLeftZeros(toHex(blockDelta['@baseFeePerGas']));
 
 		let block = Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
@@ -418,10 +418,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					trxs.push(receipt['hash']);
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
-					const hexGas = removeLeftZeros(numToHex(receipt['gas_limit']));
-					const hexGasPrice = removeLeftZeros(numToHex(receipt['charged_gas_price']));
-					const hexNonce = removeLeftZeros(numToHex(receipt['nonce']));
-					const hexTransactionIndex = removeLeftZeros(numToHex(receipt['trx_index']));
+					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
+					const hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
+					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
+					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
 					// Legacy
 					let data = {
@@ -499,7 +499,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			});
 			if(block['@baseFeePerGas']){
 				blockObj = Object.assign({}, blockObj, {
-					baseFeePerGas: removeLeftZeros(numToHex(block['@baseFeePerGas'])),
+					baseFeePerGas: removeLeftZeros(toHex(block['@baseFeePerGas'])),
 				})
 			}
 			return blockObj;
@@ -1175,8 +1175,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			console.debug(receipt);
 
 			const _blockHash = addHexPrefix(receipt['block_hash']);
-			const _blockNum = numToHex(receipt['block']);
-			const _gas = numToHex(receipt['gasused']);
+			const _blockNum = toHex(receipt['block']);
+			const _gas = toHex(receipt['gasused']);
 			let _contractAddr = null;
 			if (receipt['createdaddr']) {
 				_contractAddr = addHexPrefix(receipt['createdaddr']);
@@ -1188,22 +1188,22 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		
 			let data = {
 				blockHash: _blockHash,
-				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
+				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: removeLeftZeros(_gas),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
-				status: removeLeftZeros(numToHex(receipt['status'])),
+				status: removeLeftZeros(toHex(receipt['status'])),
 				to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 				transactionHash: receipt['hash'],
-				transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
+				transactionIndex: removeLeftZeros(toHex(receipt['trx_index'])),
 				logs: buildLogsObject(
 					receipt['logs'],
 					_blockHash,
 					_blockNum,
 					receipt['hash'],
-					numToHex(receipt['trx_index'])
+					toHex(receipt['trx_index'])
 				),
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
@@ -1240,17 +1240,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		console.debug(receipt);
 
 		const _blockHash = addHexPrefix(receipt['block_hash']);
-		const _blockNum = numToHex(receipt['block']);
+		const _blockNum = toHex(receipt['block']);
 		let data = {
 			blockHash: _blockHash,
 			blockNumber: removeLeftZeros(_blockNum),
 			from: toChecksumAddress(receipt['from']).toLowerCase(),
-			gas: removeLeftZeros(numToHex(receipt.gas_limit)),
+			gas: removeLeftZeros(toHex(receipt.gas_limit)),
 			hash: receipt['hash'],
 			input: receipt['input_data'],
-			nonce: removeLeftZeros(numToHex(receipt['nonce'])),
+			nonce: removeLeftZeros(toHex(receipt['nonce'])),
 			to: toChecksumAddress(receipt['to'])?.toLowerCase(),
-			transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
+			transactionIndex: removeLeftZeros(toHex(receipt['trx_index'])),
 			value: removeLeftZeros(receipt['value']),
 			v: removeLeftZeros(v),
 			r, s
