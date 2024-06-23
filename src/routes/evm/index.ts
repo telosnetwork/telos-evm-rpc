@@ -200,7 +200,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     }
 
 	async function getVRS(receiptDoc): Promise<any> {
-		let receipt = receiptDoc["@raw"];
+		const receipt = receiptDoc["@raw"];
 		const v = removeLeftZeros(BigInt(receipt.v).toString(16), true);
 		const r = removeLeftZeros(receipt.r, true);
 		const s = removeLeftZeros(receipt.s, true);
@@ -375,7 +375,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			});
-			let blockDelta = results?.hits?.hits[0]?._source;
+			const blockDelta = results?.hits?.hits[0]?._source;
 			if (!blockDelta) {
 				return null;
 			}
@@ -586,7 +586,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function makeInitialTrace(receipt, adHoc) {
-		let gas = addHexPrefix((receipt['gasused'] as number).toString(16));
+		const gas = addHexPrefix((receipt['gasused'] as number).toString(16));
 		let subtraces = 0;
 		for(let i = 0; i < receipt.itxs.length; i++){
 			if(receipt.itxs[i].traceAddress.length === 1){
@@ -903,7 +903,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				throw err;
 			}
 
-			let toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
+			const toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			Logger.debug(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
 			return removeLeftZeros(toReturn);
 		} catch (e) {
@@ -925,7 +925,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let err = new TransactionError('Transaction reverted');
 		err.data = receipt.output;
 
-		let output = addHexPrefix(receipt.output);
+		const output = addHexPrefix(receipt.output);
 
 		if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 			err.errorMessage = `execution reverted: ${parseRevertReason(output)}`;
@@ -934,7 +934,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		} else {
 			if(receipt.errors.length > 0){
 				err.errorMessage = `execution reverted: `;
-				for(let i in receipt.errors){
+				for(const i in receipt.errors){
 					err.errorMessage += receipt.errors[i] + ', ';
 				}
 				err.errorMessage = err.errorMessage.slice(0, -2);
@@ -955,8 +955,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         if (cachedData) {
             return cachedData;
         } else {
-            let price = await fastify.evm.getGasPrice();
-            let priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
+            const price = await fastify.evm.getGasPrice();
+            const priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
             const gasPrice = isNaN(priceInt) ? null : removeLeftZeros(Math.floor(priceInt).toString(16));
             fastify.redis.set(key, gasPrice, {
 				PX: 500
@@ -1093,8 +1093,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return leftPadZerosEvenBytes(result);
 			}
 
-			let defaultMessage = `Server error during call: ${e.message}`
-			throw new Error(defaultMessage)
+			throw new Error(`Server error during call: ${e.message}`)
 		}
 	});
 
@@ -1105,7 +1104,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		console.debug("eth_sendRawTransaction called");
 		try {
-			const rawResponse = await fastify.evm.raw({
+			const response = await fastify.evm.raw({
 				account: opts.signerAccount,
 				tx: signedTx,
 				ram_payer: fastify.evm.telosContract,
@@ -1113,13 +1112,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				getInfoResponse: await getInfo()
 			});
 
-			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
-
-			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
-			let receipt = JSON.parse(receiptLog);
+			const receiptLog = response.output.slice(response.output.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, response.output.indexOf(RECEIPT_LOG_END));
+			const receipt = JSON.parse(receiptLog);
 			if (receipt.status === 0) {
-				let err = new TransactionError('Transaction error');
-				let output = addHexPrefix(receipt.output);
+				const err = new TransactionError('Transaction error');
+				const output = addHexPrefix(receipt.output);
 				if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 					err.errorMessage = `VM Exception while processing transaction: reverted with reason string: ${parseRevertReason(output)}`;
 				} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
@@ -1132,12 +1129,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						err.errorMessage = `VM Exception while processing transaction: ${receipt?.errors[0]}`;
 				}
 				err.data = {
-					txHash: addHexPrefix(rawResponse.transactionHash)
+					txHash: addHexPrefix(response.transactionHash)
 				};
 				throw err;
 			}
 
-			return addHexPrefix(rawResponse.transactionHash);
+			return addHexPrefix(response.transactionHash);
 		} catch (e) {
 			if (opts.orderNonces) {
 				const assertionMessage = e?.response?.json?.error?.details[0]?.message
@@ -1302,8 +1299,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if(!block || block.transactions?.length === 0) return null; 
 		const trxIndex = parseInt(trxIndexHex, 16);
 		if(!block.transactions[trxIndex]) return null; 
-		let trx = block.transactions[trxIndex];
-		trx.chainId = CHAIN_ID_HEX;
+		const trx = block.transactions[trxIndex];
 		return trx;
 	});
 
@@ -1422,9 +1418,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			queryBody.bool.must.push({ term: { "@raw.block_hash": blockHash } })
 		} else {
 
-			let fromBlockExplicit = await toBlockNumber(params.fromBlock || 'latest');
+			const fromBlockExplicit = await toBlockNumber(params.fromBlock || 'latest');
 			fromBlock = typeof(fromBlockExplicit) == 'string' ? parseInt(fromBlockExplicit, 16) : fromBlockExplicit;
-			let toBlockExplicit = await toBlockNumber(params.toBlock || 'latest')
+			const toBlockExplicit = await toBlockNumber(params.toBlock || 'latest')
 			toBlock = typeof(toBlockExplicit) == 'string' ? parseInt(toBlockExplicit, 16) : toBlockExplicit;
 
 			/*
@@ -1483,7 +1479,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					return;
 
 				//console.debug(`topic: ${topic}`);
-				let trimmed = removeZeroHexFromFilter(topic, false);
+				const trimmed = removeZeroHexFromFilter(topic, false);
 				//console.debug(`topic trimmed: ${trimmed}`);
 
 				if (Array.isArray(trimmed)) {
@@ -1556,15 +1552,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Check the eth_getlogs function above for help
 	 */
     methods.set('trace_filter', async ([parameters, client]) => {
-        let params = await parameters;
+        const params = await parameters;
         const run = async function(paramObject){
             const results = [];
-            let fromAddress = paramObject.fromAddress;
-            let toAddress = paramObject.toAddress;
-            let fromBlock: string | number = parseInt(await toBlockNumber(paramObject.fromBlock), 16);
-            let toBlock: string | number = parseInt(await toBlockNumber(paramObject.toBlock), 16);
-            let after:  number = paramObject.after; //TODO what is this?
-            let count: number = paramObject.count;
+            const fromAddress = paramObject.fromAddress;
+            const toAddress = paramObject.toAddress;
+            const fromBlock: string | number = parseInt(await toBlockNumber(paramObject.fromBlock), 16);
+            const toBlock: string | number = parseInt(await toBlockNumber(paramObject.toBlock), 16);
+            const after:  number = paramObject.after; //TODO what is this?
+            const count: number = paramObject.count;
 
             if (typeof fromAddress !== 'undefined') {
                 fromAddress.forEach((addr, index) => fromAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
@@ -1655,7 +1651,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             return results;
         }
         if(Array.isArray(params)){
-            const results = [];
+            let results = [];
             for (const param_obj of params) {
                 results.concat(run(param_obj));
             }
@@ -1742,7 +1738,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		})
 		let transactions = []
 		for (let i = 0; i < sortedReceipts.length; i++) {
-			let receipt = sortedReceipts[i];
+			const receipt = sortedReceipts[i];
 			let trx: any = makeTraces(receipt, true);
 			trx.transactionHash = receipt.hash;
 			transactions.push(trx);
@@ -1760,7 +1756,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		})
 		let traces = []
 		for (let i = 0; i < sortedReceipts.length; i++) {
-			let receipt = sortedReceipts[i];
+			const receipt = sortedReceipts[i];
 			let trxTraces: any = makeTraces(receipt, false);
 			traces.concat(traces, trxTraces);
 		}
@@ -1798,7 +1794,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function doRpcMethod(jsonRpcRequest: any, clientInfo, reply: any) {
 		let { jsonrpc, id, method, params } = jsonRpcRequest;
-		let { usage, limit, origin, ip } = clientInfo;
+		const { usage, limit, origin, ip } = clientInfo;
 		if(!params || !Array.isArray(params)){
 			params = [];
 		}
@@ -1845,10 +1841,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return { jsonrpc, id, result };
 			} catch (e) {
 				if (e instanceof TransactionError) {
-					let code = e.code || 3;
-					let message = e.errorMessage?.replace(/\0.*$/g,'');;
-					let data = e.data;
-					let error = { code, data, message };
+					const code = e.code || 3;
+					const message = e.errorMessage?.replace(/\0.*$/g,'');;
+					const error = { code, data: e?.data, message };
 					Logger.error(`RPCREVERT: ${new Date().toISOString()} - ${ip} | Method: ${method} | VM execution error, reverted with message: ${e.errorMessage} \n\n REQ: ${JSON.stringify(params)}\n\n ERROR RESP: ${JSON.stringify(error)}`);
 					return { jsonrpc, id, error };
 				}
@@ -1888,7 +1883,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				let promise = doRpcMethod(payload[i], clientInfo, reply);
 				promises.push(promise);
 			}
-			let responses = await Promise.all(promises);
+			const responses = await Promise.all(promises);
 
 			const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
 			Logger.log(`RPCREQUESTBATCH: ${new Date().toISOString()} - ${duration} μs - ${ip} (${usage}/${limit}) - ${origin} - BATCH OF ${responses.length}`);
