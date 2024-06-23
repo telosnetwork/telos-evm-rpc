@@ -289,7 +289,7 @@ export class TelosEvmApi {
     const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
     
     if (this.debug) {
-      console.log(`Transaction hash is: ${trx.hash()}`);
+      console.log(`Transaction hash is: ${toHex(trx.hash())}`);
     }
 
     response = Object.assign({
