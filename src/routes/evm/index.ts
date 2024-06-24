@@ -1355,6 +1355,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
+		console.debug(receipts);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
 	});
 
