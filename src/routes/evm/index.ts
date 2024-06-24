@@ -397,7 +397,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 
+			console.log(receipts[0]['@raw']);
 			const block = await getDeltaDocFromNumber(blockNum);
+			console.log(block);
 			if(!block){
 				Logger.error("Could not find block for receipts");
 				return null;
@@ -1355,7 +1357,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			_hash = _hash.slice(2);
 		}
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		console.debug(receipts);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
 	});
 
