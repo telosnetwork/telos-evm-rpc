@@ -342,7 +342,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			transactions: [],
 			extraData: extraData
 		});
-		//EIP-1559
+
+		// EIP-1559 compliant Block
 		if(baseFeePerGas){
 			block = Object.assign({}, block, {
 				baseFeePerGas: baseFeePerGas
@@ -395,6 +396,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
+
+			const block = await getDeltaDocFromNumber(blockNum);
+			if(!block){
+				Logger.error("Could not find block for receipts");
+				return null;
+			}
+			const baseFeePerGas = (block['@baseFeePerGas']) ? toHex(block['@baseFeePerGas']) : undefined;
+
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
@@ -447,27 +456,27 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 							type: receipt['type']
 						})
 					}
+					let isEIP1559 : boolean = false;
 					if(receipt['max_fee_per_gas']){
+						isEIP1559 = true;
 						data = Object.assign({}, data, {
 							maxFeePerGas: receipt['max_fee_per_gas']
 						})
 					}
 					if(receipt['max_priority_fee_per_gas']){
+						isEIP1559 = true;
 						data = Object.assign({}, data, {
 							maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 						})
+					}
+					if(isEIP1559){
+						data.effectiveFeePerGas = hexGasPrice; // Todo: use calculation ?
 					}
 						
 					console.debug("DATA FROM RECEIPT");
 					console.debug(data);
 					trxs.push(data);
 				}
-			}
-
-			const block = await getDeltaDocFromNumber(blockNum);
-			if(!block){
-				Logger.error("Could not find block for receipts");
-				return null;
 			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
@@ -490,9 +499,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
-			if(block['@baseFeePerGas']){
+			if(baseFeePerGas){
 				blockObj = Object.assign({}, blockObj, {
-					baseFeePerGas: removeLeftZeros(toHex(block['@baseFeePerGas'])),
+					baseFeePerGas: removeLeftZeros(baseFeePerGas),
 				})
 			}
 			return blockObj;
@@ -1179,6 +1188,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: removeLeftZeros(_gas),
+				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
@@ -1197,13 +1207,20 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//output: '0x' + receipt['output']
 			}
 			// EIP 1559
-			if(receipt['charged_gas_price']){
+			if(receipt['max_fee_per_gas']){
+				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
+				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
 				data = Object.assign({
-					effectiveGasPrice: receipt['charged_gas_price']
+					effectiveGasPrice: receipt['charged_gas_price'],
+					maxFeePerGas: receipt['max_fee_per_gas'],
+					maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 				}, data, {})
 			}
 			// EIP 4844
-			// got maxFeePerBlockGas & blobVersionedHashes but should we expose them ?
+			// got maxFeePerBlobGas & blobVersionedHashes
+			if(receipt['max_fee_per_blob_gas']){
+				// need blobGasUsed & blobGasPrice
+			}
 			// EIP 2718
 			if(receipt['type']){
 				data = Object.assign({
@@ -1275,7 +1292,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 			}, data, {})
 		}
-		return ;
+		return receipt;
 	});
 
 	/**
@@ -1756,8 +1773,23 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return traces;
 	});
 
+	// EIP 1559
 	methods.set('eth_feeHistory', async ([]) => {
 		throw new Error("eth_feeHistory is not supported yet");
+	});
+
+	methods.set('eth_maxPriorityFeePerGas', async ([]) => {
+		throw new Error("eth_maxPriorityFeePerGas is not supported yet");
+	});
+
+	// EIP 4844
+	methods.set('eth_blobBaseFee', async ([]) => {
+		throw new Error("eth_blobBaseFee is not supported yet");
+	});
+
+	// EIP 2718
+	methods.set('eth_createAccessList', async ([]) => {
+		throw new Error("eth_createAccessList is not supported yet");
 	});
 
 
