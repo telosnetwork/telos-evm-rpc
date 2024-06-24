@@ -393,25 +393,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		try {
 			let blockHash: string;
 			let blockHex: string;
+			let baseFeePerGas: string;
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 
-			console.log(receipts[0]['@raw']);
-			const block = await getDeltaDocFromNumber(blockNum);
-			console.log(block);
-			if(!block){
-				Logger.error("Could not find block for receipts");
-				return null;
-			}
-			const baseFeePerGas = (block['@baseFeePerGas']) ? toHex(block['@baseFeePerGas']) : undefined;
+			console.log(JSON.stringify(receipts));
 
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
-
+				if(!baseFeePerGas && block['@baseFeePerGas']){
+					baseFeePerGas = toHex(block['@baseFeePerGas']);
+				}
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
 				}
@@ -479,6 +475,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					console.debug(data);
 					trxs.push(data);
 				}
+			}
+			const block = await getDeltaDocFromNumber(blockNum);
+			if(!block){
+				Logger.error("Could not find block for receipts");
+				return null;
 			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
