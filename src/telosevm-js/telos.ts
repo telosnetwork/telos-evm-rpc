@@ -286,7 +286,6 @@ export class TelosEvmApi {
       console.log(`In raw, console is: ${response.processed.action_traces[0].console}`);
     }
 
-    console.log(response);
     const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
 
     response = Object.assign({
@@ -618,6 +617,8 @@ export class TelosEvmApi {
     accessList,
     maxFeePerGas,
     maxPriorityFeePerGas,
+    maxFeePerBlobGas,
+    blobVersionedHashes,
     chainId
   }: {
     sender?: string
@@ -627,7 +628,9 @@ export class TelosEvmApi {
     to?: string
     accessList?: any[]
     maxFeePerGas?: string | Buffer
-    maxPriorityFeePerGas?: string | Buffer,
+    maxPriorityFeePerGas?: string | Buffer
+    maxFeePerBlobGas?: string | Buffer
+    blobVersionedHashes?: any[]
     chainId?: number | string | Buffer
   }) {
     const nonce = await this.getNonce(sender);
@@ -645,17 +648,19 @@ export class TelosEvmApi {
                 : DEFAULT_VALUE,
         to: to,
         data: data,
+        chainId: chainId ? chainId : undefined,
+        // EIP 1559
         maxFeePerGas: maxFeePerGas ? `0x${(maxFeePerGas as any).toString(16)}` : undefined,
         maxPriorityFeePerGas: maxPriorityFeePerGas ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : undefined,
-        accessList: accessList ? accessList : undefined,
-        chainId: chainId ? chainId : undefined
+        // EIP 4844
+        maxFeePerBlobGas: maxFeePerBlobGas ? `0x${(maxFeePerBlobGas as any).toString(16)}` : undefined,
+        blobVersionedHashes: blobVersionedHashes ? blobVersionedHashes : undefined,
+        // EIP 2930
+        accessList: accessList ? accessList : undefined
     };
     
-    console.log('txData: ', txData);
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
-    console.log('tx: ', tx);
     let message : Uint8Array[] | Uint8Array = tx.getMessageToSign();
-    console.log('message: ', message);
     if(isLegacyTx(tx)){
       message = RLP.encode(message);
     }

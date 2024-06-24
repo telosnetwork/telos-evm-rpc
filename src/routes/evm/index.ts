@@ -400,8 +400,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
-				console.debug("BLOCK FROM RECEIPT");
-				console.debug(receipt);
 
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
@@ -430,7 +428,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
-						maxFeePerGas: hexGasPrice,
+						effectiveFeePerGas: hexGasPrice,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -448,11 +446,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						data = Object.assign({}, data, {
 							type: receipt['type']
 						})
-						if(receipt['type'] === '0x2'){
-							data = Object.assign({}, data, {
-								effectiveGasPrice: hexGasPrice
-							})
-						}
 					}
 					if(receipt['max_fee_per_gas']){
 						data = Object.assign({}, data, {
@@ -1157,7 +1150,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns the receipt of a transaction by transaction hash.
 	 */
 	methods.set('eth_getTransactionReceipt', async ([trxHash, client]) => {
-		console.debug("eth_getTransactionReceipt called for " + trxHash);
 		if (trxHash) {
 
 			// lookup receipt delta
@@ -1169,7 +1161,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const receiptAction = await searchActionByHash(trxHash, client);
 			if (!receiptAction) return null;
 			const receipt = receiptAction['@raw'];
-			console.debug(receipt);
 
 			const _blockHash = addHexPrefix(receipt['block_hash']);
 			const _blockNum = toHex(receipt['block']);
@@ -1205,11 +1196,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
+			// EIP 1559
 			if(receipt['charged_gas_price']){
 				data = Object.assign({
 					effectiveGasPrice: receipt['charged_gas_price']
 				}, data, {})
 			}
+			// EIP 4844
+			// got maxFeePerBlockGas & blobVersionedHashes but should we expose them ?
 			// EIP 2718
 			if(receipt['type']){
 				data = Object.assign({
@@ -1228,7 +1222,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a transaction for a given hash.
 	 */
 	methods.set('eth_getTransactionByHash', async ([trxHash, client]) => {
-		console.debug(`eth_getTransactionByHash called for ${trxHash}`);
 		// lookup raw action
 		const receiptAction = await searchActionByHash(trxHash, client);
 		if (!receiptAction) return null;
@@ -1761,6 +1754,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			traces.concat(traces, trxTraces);
 		}
 		return traces;
+	});
+
+	methods.set('eth_feeHistory', async ([]) => {
+		throw new Error("eth_feeHistory is not supported yet");
 	});
 
 
