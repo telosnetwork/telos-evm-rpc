@@ -286,11 +286,8 @@ export class TelosEvmApi {
       console.log(`In raw, console is: ${response.processed.action_traces[0].console}`);
     }
 
+    console.log(response);
     const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
-    
-    if (this.debug) {
-      console.log(`Transaction hash is: ${toHex(trx.hash())}`);
-    }
 
     response = Object.assign({
       transactionHash: toHex(trx.hash()),
