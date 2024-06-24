@@ -408,6 +408,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const receipt = receiptDoc._source['@raw'];
 				if(!block){
 					block = await getDeltaDocFromNumber(blockNum);
+					console.log(block);
 					if(!block){
 						Logger.error("Could not find block for receipts");
 						return null;
@@ -520,6 +521,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getReceiptsByTerm(term: string, value: any) {
 		const termStruct = {};
 		termStruct[term] = value;
+		console.log(termStruct);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
 			size: 2000,
