@@ -397,6 +397,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
+			let block: any;
 
 			console.log(JSON.stringify(receipts));
 
@@ -405,6 +406,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
+				if(!block){
+					block = await getDeltaDocFromNumber(blockNum);
+					if(!block){
+						Logger.error("Could not find block for receipts");
+						return null;
+					}
+				}
 				if(!baseFeePerGas && block['@baseFeePerGas']){
 					baseFeePerGas = toHex(block['@baseFeePerGas']);
 				}
@@ -475,11 +483,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					console.debug(data);
 					trxs.push(data);
 				}
-			}
-			const block = await getDeltaDocFromNumber(blockNum);
-			if(!block){
-				Logger.error("Could not find block for receipts");
-				return null;
 			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
