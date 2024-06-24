@@ -437,7 +437,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
-						effectiveFeePerGas: hexGasPrice,
+						effectiveGasPrice: hexGasPrice,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -470,7 +470,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveFeePerGas = hexGasPrice; // Todo: use calculation ?
+						data.effectiveGasPrice = hexGasPrice; // Todo: use calculation ?
 					}
 						
 					console.debug("DATA FROM RECEIPT");
