@@ -346,6 +346,7 @@ export class TelosEvmApi {
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
       ], trxVars, getInfoResponse, this.writeAPI);
+      console.debug("Estimate Antelope result: " + JSON.stringify(result));
       const consolePrinting = this.getConsoleFromSendTransaction2Response(result);
       return this.handleEstimateGasConsole(consolePrinting);
     } catch (e: any) {

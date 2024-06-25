@@ -1287,7 +1287,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		if(receipt.charged_gas_price){
 			data = Object.assign({
-				gasPrice: receipt.charged_gas_price
+				gasPrice: receipt.charged_gas_price,
+				effectiveGasPrice: receipt.charged_gas_price
 			}, data, {})
 		}
 		if(receipt['max_fee_per_gas']){
@@ -1783,25 +1784,42 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	// EIP 1559
 	methods.set('eth_feeHistory', async ([]) => {
+		// 2.0 (?)
 		throw new Error("eth_feeHistory is not supported yet");
 	});
 
 	methods.set('eth_maxPriorityFeePerGas', async ([]) => {
-		throw new Error("eth_maxPriorityFeePerGas is not supported yet");
+		// As our miners are on Antelope they do not need this fee, so we return the minimum (1) as max
+		return '0x01';
 	});
 
 	// EIP 4844
 	methods.set('eth_blobBaseFee', async ([]) => {
+		// TODO
 		throw new Error("eth_blobBaseFee is not supported yet");
 	});
 
-	// EIP 2718
-	methods.set('eth_createAccessList', async ([]) => {
+	// EIP 2930
+	methods.set('eth_createAccessList', async ([trx, block]) => {
+		// CreateAccessList creates an EIP-2930 type AccessList for the given transaction. Which means playing the transaction and getting all addresses and storage keys of those addresses the contract interacts with as well as the gas used
+		// If the accesslist creation fails an error is returned.
+		// If the transaction itself fails, a vmErr is returned.
+		const response = {
+			"accessList": [
+				{
+					"address": "0xa02457e5dfd32bda5fc7e1f1b008aa5979568150",
+					"storageKeys": [
+						"0x0000000000000000000000000000000000000000000000000000000000000081",
+					]
+				}
+			],
+			"gasUsed": "0x125f8"
+		}
 		throw new Error("eth_createAccessList is not supported yet");
 	});
 
 
-	/*
+	/*f
 	// TODO: once we understand what the index position is...
 	methods.set('trace_get', async ([block, indexPositions]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
