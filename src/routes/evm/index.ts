@@ -1220,8 +1220,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
 				data = Object.assign({
 					effectiveGasPrice: receipt['charged_gas_price'],
-					maxFeePerGas: receipt['max_fee_per_gas'],
-					maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
+					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas']),
+					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])
 				}, data, {})
 			}
 			// EIP 4844
