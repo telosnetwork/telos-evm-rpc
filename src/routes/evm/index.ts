@@ -406,6 +406,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
+				if (!blockHex) {
+					blockNum = Number(receipt['block']);
+					blockHex = addHexPrefix(blockNum.toString(16));
+				}
 				if(!block){
 					block = await getDeltaDocFromNumber(blockNum);
 					console.log(block);
@@ -419,10 +423,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
-				}
-				if (!blockHex) {
-					blockNum = Number(receipt['block']);
-					blockHex = addHexPrefix(blockNum.toString(16));
 				}
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
