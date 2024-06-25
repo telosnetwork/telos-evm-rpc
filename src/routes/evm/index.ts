@@ -467,13 +467,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					if(receipt['max_fee_per_gas']){
 						isEIP1559 = true;
 						data = Object.assign({}, data, {
-							maxFeePerGas: receipt['max_fee_per_gas']
+							maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas']))
 						})
 					}
 					if(receipt['max_priority_fee_per_gas']){
 						isEIP1559 = true;
 						data = Object.assign({}, data, {
-							maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
+							maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
 						})
 					}
 					if(isEIP1559){
