@@ -507,6 +507,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					baseFeePerGas: removeLeftZeros(baseFeePerGas),
 				}, blockObj)
 			}
+			if(this.debug){
+				console.log(blockObj);
+			}
 			return blockObj;
 		} catch (e) {
 			Logger.error(client.ip + JSON.stringify(e));
