@@ -635,6 +635,9 @@ export class TelosEvmApi {
   }) {
     const nonce = await this.getNonce(sender);
     const gasPrice = await this.getGasPrice();
+    if(maxPriorityFeePerGas && maxFeePerGas === '0'){
+      maxFeePerGas = gasPrice;
+    }
     const txData = {
         nonce: nonce,
         gasPrice: `0x${gasPrice.toString(16)}`,
