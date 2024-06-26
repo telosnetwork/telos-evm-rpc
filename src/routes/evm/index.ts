@@ -474,7 +474,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveGasPrice = hexGasPrice; // Todo: use calculation ?
+						data.effectiveGasPrice = hexGasPrice; 
+						// use calculation or is charged_gas_price the same in which case we can delete this if clause & isEIP1559 boolean entirely ?
 					}
 						
 					trxs.push(data);
@@ -502,9 +503,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
 			if(baseFeePerGas){
-				blockObj = Object.assign({}, blockObj, {
+				blockObj = Object.assign({
 					baseFeePerGas: removeLeftZeros(baseFeePerGas),
-				})
+				}, blockObj)
 			}
 			return blockObj;
 		} catch (e) {
