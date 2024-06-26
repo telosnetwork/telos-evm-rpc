@@ -178,8 +178,6 @@ export class TelosEvmApi {
     try {
       let transaction: AntelopeTransaction
       const abi = await this.getAbi()
-      console.log(trxVars);
-      console.log(actions);
 
       if (trxVars) {
         transaction = AntelopeTransaction.from({
@@ -265,7 +263,7 @@ export class TelosEvmApi {
     if (!ram_payer) ram_payer = account;
 
     if (this.debug) {
-      console.log(`In raw, tx is: ${tx}`);
+      console.debug(`In raw, tx is: ${tx}`);
     }
     let response: any = {};
     response = await this.transact([
@@ -283,7 +281,7 @@ export class TelosEvmApi {
     ], trxVars, getInfoResponse, this.writeAPI);
 
     if (this.debug) {
-      console.log(`In raw, console is: ${response.processed.action_traces[0].console}`);
+      console.debug(`In raw, console is: ${response.processed.action_traces[0].console}`);
     }
 
     const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
@@ -329,7 +327,7 @@ export class TelosEvmApi {
     if (!ram_payer) ram_payer = account;
 
     if(this.debug){
-      console.log(`In estimateGas, raw tx is: ${tx}`);
+      console.debug(`In estimateGas, raw tx is: ${tx}`);
     }
 
     try {
@@ -346,7 +344,6 @@ export class TelosEvmApi {
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
       ], trxVars, getInfoResponse, this.writeAPI);
-      console.debug("Estimate Antelope result: " + JSON.stringify(result));
       const consolePrinting = this.getConsoleFromSendTransaction2Response(result);
       return this.handleEstimateGasConsole(consolePrinting);
     } catch (e: any) {
@@ -373,7 +370,9 @@ export class TelosEvmApi {
   handleEstimateGasConsole(message : string): string {
     const result = message.match(/(0[xX][0-9a-fA-F]*)$/);
 
-    console.log(`In handleEstimateGasConsole, message is: ${message}`);
+    if(this.debug){
+      console.debug(`In handleEstimateGasConsole, message is: ${message}`);
+    }
     const receiptLog = message.slice(
         message.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length,
         message.indexOf(RECEIPT_LOG_END)
@@ -383,7 +382,7 @@ export class TelosEvmApi {
     try {
       receipt = JSON.parse(receiptLog);
     } catch (e) {
-      console.log('WARNING: Failed to parse receiptLog in estimate gas');
+      console.warn('WARNING: Failed to parse receiptLog in estimate gas');
     }
 
     if (receipt?.status === 0) {

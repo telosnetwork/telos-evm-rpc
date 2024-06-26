@@ -399,8 +399,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let bloom = new Bloom();
 			let block: any;
 
-			console.log(JSON.stringify(receipts));
-
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
@@ -412,7 +410,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 				if(!block){
 					block = await getDeltaDocFromNumber(blockNum);
-					console.log(block);
 					if(!block){
 						Logger.error("Could not find block for receipts");
 						return null;
@@ -480,8 +477,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						data.effectiveGasPrice = hexGasPrice; // Todo: use calculation ?
 					}
 						
-					console.debug("DATA FROM RECEIPT");
-					console.debug(data);
 					trxs.push(data);
 				}
 			}
@@ -521,7 +516,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getReceiptsByTerm(term: string, value: any) {
 		const termStruct = {};
 		termStruct[term] = value;
-		console.log(termStruct);
 		const results = await fastify.elastic.search({
 			index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
 			size: 2000,
@@ -866,7 +860,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * allow the transaction to complete.
 	 */
 	methods.set('eth_estimateGas', async ([txParams, block]) => {
-		console.debug("eth_estimateGas called");
 		if (txParams.hasOwnProperty('value')) {
 			// If value is not 0 check there is an account first
 			if(txParams.value > 0){
@@ -886,10 +879,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 
 		const encodedTx : string = await fastify.evm.createEthTx({
-			...txParams,
 			sender: txParams.from,
-			gasPrice: 10000000000000000,
-			gasLimit: 10000000000000000
+			gasPrice: await fastify.evm.getGasPrice(),
+			gasLimit: 10000000000000000,
+			...txParams
 		});
 
 		try {
@@ -1015,7 +1008,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * transaction on the block chain.
 	 */
 	methods.set('eth_call', async ([txParams]) => {
-		console.debug("eth_call called");
 		let _value = ethers.BigNumber.from(0);
 		if (txParams.value) {
 			_value = ethers.BigNumber.from(txParams.value);
@@ -1112,7 +1104,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Ethereum network.
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
-		console.debug("eth_sendRawTransaction called");
 		try {
 			const response = await fastify.evm.raw({
 				account: opts.signerAccount,
@@ -1235,8 +1226,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					type: receipt['type']
 				}, data, {})
 			}
-			console.debug("DATA FROM RECEIPT");
-			console.debug(data);
 			return data;
 		} else {
 			return null;
@@ -1252,7 +1241,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (!receiptAction) return null;
 		const {v, r, s} = await getVRS(receiptAction);
 		const receipt = receiptAction['@raw'];
-		console.debug(receipt);
 
 		const _blockHash = addHexPrefix(receipt['block_hash']);
 		const _blockNum = toHex(receipt['block']);
@@ -1784,7 +1772,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	// EIP 1559
 	methods.set('eth_feeHistory', async ([]) => {
-		// 2.0 (?)
+		// 2.0 
 		throw new Error("eth_feeHistory is not supported yet");
 	});
 
@@ -1802,19 +1790,21 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	// EIP 2930
 	methods.set('eth_createAccessList', async ([trx, block]) => {
 		// CreateAccessList creates an EIP-2930 type AccessList for the given transaction. Which means playing the transaction and getting all addresses and storage keys of those addresses the contract interacts with as well as the gas used
-		// If the accesslist creation fails an error is returned.
+		// We would need contract work to support this I think with a method that ultimately reverts the transaction with a custom reason and returns the access list AND gas estimation.
+		// Our method would look something like this:
 		// If the transaction itself fails, a vmErr is returned.
-		const response = {
-			"accessList": [
-				{
-					"address": "0xa02457e5dfd32bda5fc7e1f1b008aa5979568150",
-					"storageKeys": [
-						"0x0000000000000000000000000000000000000000000000000000000000000081",
-					]
-				}
-			],
-			"gasUsed": "0x125f8"
-		}
+		// Else we give back the accessList as well as gasUsed in a response which should look like this
+		// const response = {
+		// 	"accessList": [
+		//		 {
+		//		 	 "address": "0xa02457e5dfd32bda5fc7e1f1b008aa5979568150",
+		// 			 "storageKeys": [
+		//			 	"0x0000000000000000000000000000000000000000000000000000000000000081",
+		//			 ]
+		//		 }
+		//	 ],
+		//	 "gasUsed": "0x125f8"
+		// }
 		throw new Error("eth_createAccessList is not supported yet");
 	});
 
