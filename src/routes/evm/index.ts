@@ -393,7 +393,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		try {
 			let blockHash: string;
 			let blockHex: string;
-			let baseFeePerGas: string;
+			let baseFeePerGas: string | null = null;
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
