@@ -393,7 +393,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		try {
 			let blockHash: string;
 			let blockHex: string;
-			let baseFeePerGas: string | null = null;
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
@@ -411,13 +410,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 				if(!block){
 					block = await getDeltaDocFromNumber(blockNum);
-					console.log(block);
 					if(!block){
 						Logger.error("Could not find block for receipts");
 						return null;
-					}
-					if(!baseFeePerGas && block['@baseFeePerGas']){
-						baseFeePerGas = toHex(block['@baseFeePerGas']);
 					}
 				}
 				if (!blockHash) {
@@ -505,11 +500,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
-			if(baseFeePerGas){
-				blockObj = Object.assign({
-					baseFeePerGas: removeLeftZeros(baseFeePerGas),
-				}, blockObj)
-			}
 			if(this.debug){
 				console.log(blockObj);
 			}
