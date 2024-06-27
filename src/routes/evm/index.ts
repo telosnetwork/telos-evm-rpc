@@ -398,6 +398,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 			let block: any;
+			let hexGasPrice: string;
 
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
@@ -431,7 +432,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
 					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
-					const hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
+					hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
@@ -500,6 +501,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
+				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
