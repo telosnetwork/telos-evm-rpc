@@ -410,13 +410,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				}
 				if(!block){
 					block = await getDeltaDocFromNumber(blockNum);
+					console.log(block);
 					if(!block){
 						Logger.error("Could not find block for receipts");
 						return null;
 					}
-				}
-				if(!baseFeePerGas && block['@baseFeePerGas']){
-					baseFeePerGas = toHex(block['@baseFeePerGas']);
+					if(!baseFeePerGas && block['@baseFeePerGas']){
+						baseFeePerGas = toHex(block['@baseFeePerGas']);
+					}
 				}
 				if (!blockHash) {
 					blockHash = addHexPrefix(receipt['block_hash']);
