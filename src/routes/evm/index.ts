@@ -41,6 +41,17 @@ const REVERT_PANIC_SELECTOR = '0x4e487b71'
 
 const EOSIO_ASSERTION_PREFIX = 'assertion failure with message: '
 
+const MIN_PROTOCOL_BASE_FEE = 7;
+
+const HARDFORKS = {
+	41: {
+		london: 12_965_000,
+	},
+	40: {
+		london: 12_965_000,
+	},
+};
+
 @Struct.type('call')
 export class Call extends Struct {
 	@Struct.field(Name) ram_payer!: Name
@@ -125,15 +136,7 @@ class TransactionError extends Error {
 export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	const methods: Map<string, (params?: any) => Promise<any> | any> = new Map();
-	const decimalsBN = new BN('1000000000000000000');
-	const zeros = "0x0000000000000000000000000000000000000000";
-	const chainAddr = [
-		"0xb1f8e55c7f64d203c1400b9d8555d050f94adf39",
-		"0x9f510b19f1ad66f0dcf6e45559fab0d6752c1db7",
-		"0xb8e671734ce5c8d7dfbbea5574fa4cf39f7a54a4",
-		"0xb1d3fbb2f83aecd196f474c16ca5d9cffa0d0ffc",
-	];
-	const chainIds = [1, 3, 4, 42];
+	const decimalsBN = new BN('1000000000000000000'); 
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
 
@@ -397,7 +400,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 			let block: any;
-			let hexGasPrice: string;
 
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
@@ -427,7 +429,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
 					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
-					hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
+					const hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
@@ -471,7 +473,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveGasPrice = hexGasPrice; 
+						data.effectiveGasPrice = removeLeftZeros(toHex(Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'] - MIN_PROTOCOL_BASE_FEE, receipt['max_fee_per_gas'])));
 						// use calculation or is charged_gas_price the same in which case we can delete this if clause & isEIP1559 boolean entirely ?
 					}
 						
@@ -496,7 +498,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
-				baseFeePerGas: hexGasPrice,
+				baseFeePerGas: MIN_PROTOCOL_BASE_FEE,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
@@ -1206,8 +1208,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(receipt['max_fee_per_gas']){
 				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
 				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
+				const effectiveGasPrice = Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'] - MIN_PROTOCOL_BASE_FEE, receipt['max_fee_per_gas']);
 				data = Object.assign({
-					effectiveGasPrice: receipt['charged_gas_price'],
+					effectiveGasPrice: removeLeftZeros(toHex(effectiveGasPrice)),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
 					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
 				}, data, {})
