@@ -210,6 +210,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 		return {v,r,s};
 	}
+	
+	async function getCumulativeGasUsed(blockHash, index, client){
+		// We need to get block receipts and sum gasUsed until we reach the transaction indexx
+		let cumulativeGasUsed = 0;
+		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
+		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(blockHash);
+		for (let i = 0; i < index; i++) {
+			cumulativeGasUsed += block['transactions'][i]['gasUsed'];
+		}
+		return cumulativeGasUsed;
+	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
 		Logger.debug(`searching action by hash: ${trxHash}`)
@@ -333,7 +344,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
-		const baseFeePerGas = removeLeftZeros(toHex(blockDelta['@baseFeePerGas']));
 
 		let block = Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
@@ -341,15 +351,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			hash: blockHash,
 			logsBloom: addHexPrefix(new Bloom().bitvector.toString("hex")),
 			number: blockNumberHex,
+			baseFeePerGas: MIN_PROTOCOL_BASE_FEE,
 			timestamp: removeLeftZeros(timestamp?.toString(16)),
 			transactions: [],
 			extraData: extraData
 		});
 
-		// EIP-1559 compliant Block
-		if(baseFeePerGas){
+		if(blockDelta['@baseFeePerGas']){
 			block = Object.assign({}, block, {
-				baseFeePerGas: baseFeePerGas
+				baseFeePerGas: removeLeftZeros(toHex(blockDelta['@baseFeePerGas']))
 			})
 		}
 		return block;
@@ -1185,7 +1195,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
-				cumulativeGasUsed: removeLeftZeros(_gas),
+				cumulativeGasUsed: getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index'], client),
 				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
