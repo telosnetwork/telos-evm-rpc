@@ -108,6 +108,13 @@ export function toHex(input: number | string | Uint8Array | Uint8Array[]) : stri
     }
 } 
 
+export function minBN(...args : typeof BN[]) {
+    if (args.length === 0) throw new Error('No arguments provided');
+
+    return args.reduce((min, current) => {
+        return min.cmp(current) < 0 ? min : current;
+    });
+}
 export function toLowerCaseAddress(address) {
     if (!address)
         return null

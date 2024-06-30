@@ -13,6 +13,7 @@ import {
 	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed,
 	parsePanicReason, parseRevertReason, toOpname,
+	minBN,
 } from "../../util/utils"
 import MyLogger from "../../logging";
 import moment from "moment";
@@ -484,8 +485,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveGasPrice = removeLeftZeros(toHex(Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'], receipt['max_fee_per_gas'])));
-						// use calculation or is charged_gas_price the same in which case we can delete this if clause & isEIP1559 boolean entirely ?
+						data.effectiveGasPrice = removeLeftZeros(minBN([BN(receipt['charged_gas_price']) + BN(receipt['max_priority_fee_per_gas']), BN(receipt['max_fee_per_gas'])]).toString(16));
 					}
 						
 					trxs.push(data);
@@ -497,9 +497,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const blockSize = addHexPrefix(block['size'].toString(16));
 			const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
 
-			// If we didn't get the gas price from transactions (ie: no transactions on block)
-			// We get the current gas price
-			// This is a fix because we do not save baseFeePerGas on blocks in translator, it means we shouldn't change our fixed gas price before 2.0 replaces all of this
+			// If we didn't get the gas price from transactions (ie: no transactions on block) we get the current gas price
+			// This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data, i
+			// It means we shouldn't change our fixed gas price before 2.0 replaces all of this else historical data on empty blocks will be wrong and show current gas price instead of the one at the time block was written
 			if(hexGasPrice === null){
 				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
 			}
@@ -516,7 +516,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
-				baseFeePerGas: hexGasPrice, // We get this from a single transaction as our gas price is fixed
+				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
