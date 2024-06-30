@@ -410,6 +410,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let logsBloom: any = null;
 			let bloom = new Bloom();
 			let block: any;
+			let hexGasPrice : string; 
 
 			const trxs = [];
 			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
@@ -439,7 +440,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
 					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
-					const hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
+					hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
@@ -483,7 +484,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveGasPrice = removeLeftZeros(toHex(Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'] - MIN_PROTOCOL_BASE_FEE, receipt['max_fee_per_gas'])));
+						data.effectiveGasPrice = removeLeftZeros(toHex(Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'], receipt['max_fee_per_gas'])));
 						// use calculation or is charged_gas_price the same in which case we can delete this if clause & isEIP1559 boolean entirely ?
 					}
 						
@@ -495,6 +496,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const extraData = addHexPrefix(block['@blockHash']);
 			const blockSize = addHexPrefix(block['size'].toString(16));
 			const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
+
+			// If we didn't get the gas price from transactions (ie: no transactions on block)
+			// We get the current gas price
+			// This is a fix because we do not save baseFeePerGas on blocks in translator, it means we shouldn't change our fixed gas price before 2.0 replaces all of this
+			if(hexGasPrice === null){
+				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
+			}
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
 			let blockObj = Object.assign({}, BLOCK_TEMPLATE, {
@@ -508,7 +516,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
-				baseFeePerGas: MIN_PROTOCOL_BASE_FEE,
+				baseFeePerGas: hexGasPrice, // We get this from a single transaction as our gas price is fixed
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			});
