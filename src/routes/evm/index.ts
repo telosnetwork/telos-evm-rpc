@@ -414,7 +414,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let hexGasPrice : string; 
 
 			const trxs = [];
-			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
+			console.log(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
@@ -485,9 +485,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						data.effectiveGasPrice = removeLeftZeros(minBN([BN(receipt['charged_gas_price']) + BN(receipt['max_priority_fee_per_gas']), BN(receipt['max_fee_per_gas'])]).toString(16));
+						data.effectiveGasPrice = removeLeftZeros(minBN([BN(receipt['charged_gas_price']) + BN(receipt['max_priority_fee_per_gas']), BN(receipt['max_fee_per_gas'])]).toString('hex'));
 					}
-						
 					trxs.push(data);
 				}
 			}
@@ -503,6 +502,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(hexGasPrice === null){
 				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
 			}
+			console.log(`Trx parsed: ${JSON.stringify(trxs)}`)
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
 			let blockObj = Object.assign({}, BLOCK_TEMPLATE, {
