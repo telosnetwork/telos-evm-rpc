@@ -94,14 +94,27 @@ const BLOCK_TEMPLATE =
 
 export { BLOCK_TEMPLATE, NEW_HEADS_TEMPLATE, EMPTY_LOGS }
 
-export function numToHex(input: number | string) {
+export function toHex(input: number | string | Uint8Array | Uint8Array[]) : string {
     if (typeof input === 'number') {
         return '0x' + input.toString(16)
-    } else {
+    } else if (typeof input === 'string') {
         return '0x' + new BN(input).toString(16)
+    } else if (input instanceof Uint8Array) {
+        return Array.from(input)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    } else if (Array.isArray(input)) {
+        return input.map(toHex).join('');
     }
-}
+} 
 
+export function minBN(...args : typeof BN[]) {
+    if (args.length === 0) throw new Error('No arguments provided');
+
+    return args.reduce((min, current) => {
+        return min.cmp(current) < 0 ? min : current;
+    });
+}
 export function toLowerCaseAddress(address) {
     if (!address)
         return null
@@ -148,7 +161,7 @@ export function buildLogsObject(logs: any[], blHash: string, blNumber: string, t
                 blockHash: blHash,
                 blockNumber: blNumber,
                 data: "0x" + log.data,
-                logIndex: numToHex(counter),
+                logIndex: toHex(counter),
                 removed: false,
                 topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
                 transactionHash: txHash,
@@ -235,12 +248,12 @@ export function makeLogObject(rawActionDocument, log, forSubscription) {
     let baseLogObj = {
         address: toChecksumAddress('0x' + log.address),
         blockHash: '0x' + rawActionDocument['@raw']['block_hash'],
-        blockNumber: numToHex(rawActionDocument['@raw']['block']),
+        blockNumber: toHex(rawActionDocument['@raw']['block']),
         data: '0x' + log.data,
-        logIndex: numToHex(log.logIndex),
+        logIndex: toHex(log.logIndex),
         topics: log.topics.map(t => '0x' + t.padStart(64, '0')),
         transactionHash: trx,
-        transactionIndex: numToHex(rawActionDocument['@raw']['trx_index'])
+        transactionIndex: toHex(rawActionDocument['@raw']['trx_index'])
     }
 
     if (forSubscription)

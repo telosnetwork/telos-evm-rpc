@@ -1,7 +1,7 @@
 import { Account } from './interfaces'
-import * as ethTx from '@ethereumjs/tx'
-const { Transaction } = ethTx
-import Common from '@ethereumjs/common'
+import { TransactionFactory, isLegacyTx } from '@ethereumjs/tx'
+import { RLP } from '@ethereumjs/rlp'
+import { Common, Hardfork} from '@ethereumjs/common';
 import {DEFAULT_GAS_LIMIT, DEFAULT_VALUE, ETH_CHAIN, FORK} from './constants'
 import {
   API,
@@ -14,6 +14,7 @@ import {
   SignedTransaction,
   Action, ABI,
 } from "@wharfkit/antelope"
+import { toHex } from '../util/utils';
 
 const BN = require('bn.js')
 
@@ -88,9 +89,8 @@ export class TelosEvmApi {
     retryTrxNumBlocks: number
   }) {
     try {
-      let provider = new FetchProvider(nodeosRead);
       this.readAPI = new APIClient({
-        provider: provider
+        provider: new FetchProvider(nodeosRead)
       })
     } catch (e) {
       throw new Error(`Failed to create read API: ${e.message}`)
@@ -106,7 +106,10 @@ export class TelosEvmApi {
     this.retryTrxNumBlocks = retryTrxNumBlocks
     this.chainId = Checksum256.from(antelopeChainId)
     this.signingKey = PrivateKey.from(telosPrivateKey)
-    this.chainConfig = Common.forCustomChain(ETH_CHAIN, { chainId: evmChainId }, FORK)
+    this.chainConfig = Common.custom({chainId: evmChainId}, {
+      hardfork: Hardfork.London,
+      eips: [1559]
+    });
     this.telosContract = telosContract
     this.debug = false
   }
@@ -255,16 +258,15 @@ export class TelosEvmApi {
     trxVars: TransactionVars
     getInfoResponse: API.v1.GetInfoResponse
   }) {
-    if (tx && tx.startsWith('0x')) tx = tx.substring(2)
-    if (sender && sender.startsWith('0x')) sender = sender.substring(2)
-    if (!ram_payer) ram_payer = account
+    if (tx && tx.startsWith('0x')) tx = tx.substring(2);
+    if (sender && sender.startsWith('0x')) sender = sender.substring(2);
+    if (!ram_payer) ram_payer = account;
 
     if (this.debug) {
-      console.log(`In raw, tx is: ${tx}`)
+      console.debug(`In raw, tx is: ${tx}`);
     }
-
-    let response: any = {}
-    response.telos = await this.transact([
+    let response: any = {};
+    response = await this.transact([
       {
         account: this.telosContract,
         name: 'raw',
@@ -276,23 +278,22 @@ export class TelosEvmApi {
         },
         authorization: [{ actor: account, permission: this.signingPermission }]
       }
-    ], trxVars, getInfoResponse, this.writeAPI)
+    ], trxVars, getInfoResponse, this.writeAPI);
 
     if (this.debug) {
-      console.log(`In raw, console is: ${response.telos.processed.action_traces[0].console}`)
+      console.debug(`In raw, console is: ${response.processed.action_traces[0].console}`);
     }
 
-    let trx = Transaction.fromSerializedTx(Buffer.from(tx, 'hex'), {
-      common: this.chainConfig
-    })
+    const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
 
-    response.eth = {
-      transactionHash: trx.hash().toString('hex'),
+    response = Object.assign({
+      transactionHash: toHex(trx.hash()),
       transaction: trx,
-      from: sender
-    }
+      from: sender,
+      output: response.processed.action_traces[0].console
+    }, {});
 
-    return response
+    return response;
   }
 
   /**
@@ -321,9 +322,13 @@ export class TelosEvmApi {
     trxVars: TransactionVars
     getInfoResponse: API.v1.GetInfoResponse
   }) {
-    if (tx && tx.startsWith('0x')) tx = tx.substring(2)
-    if (sender && sender.startsWith('0x')) sender = sender.substring(2)
-    if (!ram_payer) ram_payer = account
+    if (tx && tx.startsWith('0x')) tx = tx.substring(2);
+    if (sender && sender.startsWith('0x')) sender = sender.substring(2);
+    if (!ram_payer) ram_payer = account;
+
+    if(this.debug){
+      console.debug(`In estimateGas, raw tx is: ${tx}`);
+    }
 
     try {
       const result = await this.transact([
@@ -338,18 +343,18 @@ export class TelosEvmApi {
           },
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
-      ], trxVars, getInfoResponse, this.writeAPI)
-      const consolePrinting = this.getConsoleFromSendTransaction2Response(result)
-      return this.handleEstimateGasConsole(consolePrinting)
+      ], trxVars, getInfoResponse, this.writeAPI);
+      const consolePrinting = this.getConsoleFromSendTransaction2Response(result);
+      return this.handleEstimateGasConsole(consolePrinting);
     } catch (e: any) {
-      const error = e?.response?.json?.error
+      const error = e?.response?.json?.error;
       if (error?.code !== 3050003) {
-        throw new Error(`Error while estimating gas: ${e.message}`)
+        throw new Error(`Error while estimating gas: ${e.message}`);
       }
       // TODO: there isn't always pending console output, so accessing message.match(/(0[xX][0-9a-fA-F]*)$/)[0] will fail, the real error message is somewhere else in the error, see example:
-      let message = error?.details[1]?.message
+      let message = error?.details[1]?.message;
       message = (message === 'pending console output: ') ? error?.details[0]?.message : message;
-      return this.handleEstimateGasConsole(message)
+      return this.handleEstimateGasConsole(message);
     }
   }
 
@@ -358,15 +363,17 @@ export class TelosEvmApi {
     if (response?.processed?.except?.code !== 3050003) {
       throw new Error(`Unable to get console output from SendTransaction2Response`)
     } else {
-      return response.processed.except.stack[1].data.console
+      return response.processed.except.stack[1].data.console;
     }
   }
 
-  handleEstimateGasConsole(message): string {
-    const result = message.match(/(0[xX][0-9a-fA-F]*)$/)
+  handleEstimateGasConsole(message : string): string {
+    const result = message.match(/(0[xX][0-9a-fA-F]*)$/);
 
-    console.log(`In handleEstimateGasConsole, message is: ${message}`);
-    let receiptLog = message.slice(
+    if(this.debug){
+      console.debug(`In handleEstimateGasConsole, message is: ${message}`);
+    }
+    const receiptLog = message.slice(
         message.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length,
         message.indexOf(RECEIPT_LOG_END)
     );
@@ -375,11 +382,11 @@ export class TelosEvmApi {
     try {
       receipt = JSON.parse(receiptLog);
     } catch (e) {
-      console.log('WARNING: Failed to parse receiptLog in estimate gas');
+      console.warn('WARNING: Failed to parse receiptLog in estimate gas');
     }
 
     if (receipt?.status === 0) {
-      let e = new GasEstimateError("Gas estimation transaction failure");
+      const e = new GasEstimateError("Gas estimation transaction failure");
       e.receipt = receipt;
       throw e;
     }
@@ -389,8 +396,8 @@ export class TelosEvmApi {
         return result[0]
       }
 
-      let resultInt = parseInt(result[0], 16);
-      let receiptInt = parseInt(receipt.gasused, 16);
+      const resultInt = parseInt(result[0], 16);
+      const receiptInt = parseInt(receipt.gasused, 16);
       return receiptInt > resultInt ? `0x${receipt.gasused}` : result[0];
     } else {
       if (receipt && receipt.hasOwnProperty('gasused')) {
@@ -398,8 +405,7 @@ export class TelosEvmApi {
       }
     }
 
-    let defaultMessage = `Server Error: Failed to estimate gas`
-    this.throwError(new Error(`Could not get gas estimation from message: ${message}`), defaultMessage)
+    this.throwError(new Error(`Could not get gas estimation from message: ${message}`), `Server Error: Failed to estimate gas`)
   }
 
 
@@ -428,9 +434,9 @@ export class TelosEvmApi {
     trxVars: TransactionVars
     getInfoResponse: API.v1.GetInfoResponse
   }) {
-    if (tx && tx.startsWith('0x')) tx = tx.substring(2)
-    if (sender && sender.startsWith('0x')) sender = sender.substring(2)
-    if (!ram_payer) ram_payer = account
+    if (tx && tx.startsWith('0x')) tx = tx.substring(2);
+    if (sender && sender.startsWith('0x')) sender = sender.substring(2);
+    if (!ram_payer) ram_payer = account;
 
     try {
       await this.transact([
@@ -445,20 +451,19 @@ export class TelosEvmApi {
           },
           authorization: [{ actor: account, permission: this.signingPermission }]
         }
-      ], trxVars, getInfoResponse, this.writeAPI)
+      ], trxVars, getInfoResponse, this.writeAPI);
     } catch (e: any) {
-      const error = e.json.error
+      const error = e.json.error;
       if (error.code !== 3050003) {
-        throw new Error('This node does not have console printing enabled')
+        throw new Error('This node does not have console printing enabled');
       }
-      const message = error.details[1].message
-      const resultMatch = message.match(/(0[xX][0-9a-fA-F]*)$/)
+      const message = error.details[1].message;
+      const resultMatch = message.match(/(0[xX][0-9a-fA-F]*)$/);
       if (resultMatch) {
         const result = resultMatch[0];
         const REVERT = "REVERT";
-        const revertLength = REVERT.length;
         const startResult = message.length - result.length;
-        const beforeResult = message.substring((startResult - revertLength), startResult);
+        const beforeResult = message.substring((startResult - REVERT.length), startResult);
         if (beforeResult == REVERT) {
           const err = new RevertError("Transaction reverted");
           err.evmCallOutput = result;
@@ -468,8 +473,7 @@ export class TelosEvmApi {
         return result;
       }
 
-      let defaultMessage = `Server Error: Error during call`
-      this.throwError(error, defaultMessage)
+      this.throwError(error, `Server Error: Error during call`);
     }
   }
 
@@ -491,8 +495,7 @@ export class TelosEvmApi {
       reverse: false, // Optional: Get reversed data
       show_payer: false // Optional: Show ram payer
     }
-    const params = Object.assign({}, defaultParams, data)
-    return await this.readAPI.v1.chain.get_table_rows(params)
+    return await this.readAPI.v1.chain.get_table_rows(Object.assign({}, defaultParams, data));
   }
 
   /**
@@ -508,8 +511,8 @@ export class TelosEvmApi {
     if (!address) throw new Error('No address provided')
     if (address.startsWith('0x')) address = address.substring(2)
 
-    address = address.toLowerCase()
-    const padded = '0'.repeat(12 * 2) + address
+    address = address.toLowerCase();
+    const padded = '0'.repeat(12 * 2) + address;
 
     const { rows } = await this.getTable({
       code: this.telosContract,
@@ -520,7 +523,7 @@ export class TelosEvmApi {
       lower_bound: padded,
       upper_bound: padded,
       limit: 1
-    })
+    });
 
     if (rows.length && rows[0].address === address) {
       return transformEthAccount(rows[0])
@@ -546,14 +549,14 @@ export class TelosEvmApi {
    * @returns {Promise<string>} Hex encoded nonce
    */
   async getNonce(address: any) {
-    if (!address) return '0x0'
+    if (!address) return '0x0';
 
-    const account = await this.getEthAccount(address)
+    const account = await this.getEthAccount(address);
 
     if (!account)
-        return '0x0'
+        return '0x0';
 
-    return `0x${account.nonce.toString(16)}`
+    return `0x${account.nonce.toString(16)}`;
   }
 
   /**
@@ -565,13 +568,13 @@ export class TelosEvmApi {
    * @returns {Promise<AccountState>} account state row containing key and value
    */
   async getStorageAt(address: string, key: string) {
-    if (!address || !key) throw new Error('Both address and key are required')
-    if (address && address.startsWith('0x')) address = address.substring(2)
+    if (!address || !key) throw new Error('Both address and key are required');
+    if (address && address.startsWith('0x')) address = address.substring(2);
 
-    if (key && key.startsWith('0x')) key = key.substring(2)
-    const paddedKey = '0'.repeat(64 - key.length) + key
+    if (key && key.startsWith('0x')) key = key.substring(2);
+    const paddedKey = '0'.repeat(64 - key.length) + key;
 
-    const acc = await this.getEthAccount(address)
+    const acc = await this.getEthAccount(address);
     if (!acc)
       return '0x0';
 
@@ -584,12 +587,12 @@ export class TelosEvmApi {
       lower_bound: paddedKey,
       upper_bound: paddedKey,
       limit: 1
-    })
+    });
 
     if (rows.length && rows[0].key === paddedKey) {
-      return '0x' + rows[0].value
+      return '0x' + rows[0].value;
     } else {
-      return '0x0'
+      return '0x0';
     }
   }
 
@@ -606,46 +609,73 @@ export class TelosEvmApi {
    * @returns {Promise<string>}RLP encoded transaction
    */
   async createEthTx({
-                      sender,
-                      data,
-                      gasLimit,
-                      value,
-                      to,
-                    }: {
+    sender,
+    data,
+    gasLimit,
+    value,
+    to,
+    accessList,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    maxFeePerBlobGas,
+    blobVersionedHashes,
+    chainId
+  }: {
     sender?: string
     data?: string
     gasLimit?: string | Buffer
     value?: number | Buffer
     to?: string
+    accessList?: any[]
+    maxFeePerGas?: string | Buffer
+    maxPriorityFeePerGas?: string | Buffer
+    maxFeePerBlobGas?: string | Buffer
+    blobVersionedHashes?: any[]
+    chainId?: number | string | Buffer
   }) {
-    const nonce = await this.getNonce(sender)
-    const gasPrice = await this.getGasPrice()
-    const txData = {
-      nonce,
-      gasPrice: `0x${gasPrice.toString(16)}`,
-      gasLimit:
-          gasLimit !== undefined
-              ? `0x${(gasLimit as any).toString(16)}`
-              : DEFAULT_GAS_LIMIT,
-      value:
-          value !== undefined
-              ? `0x${(value as any).toString(16)}`
-              : DEFAULT_VALUE,
-      to,
-      data
+    const nonce = await this.getNonce(sender);
+    const gasPrice = await this.getGasPrice();
+    if(maxPriorityFeePerGas && maxFeePerGas === '0'){
+      maxFeePerGas = gasPrice;
     }
-
-    const tx = new Transaction(txData, { common: this.chainConfig })
-
-    return tx.serialize().toString('hex')
+    const txData = {
+        nonce: nonce,
+        gasPrice: `0x${gasPrice.toString(16)}`,
+        gasLimit:
+            gasLimit !== undefined
+                ? `0x${(gasLimit as any).toString(16)}`
+                : DEFAULT_GAS_LIMIT,
+        value:
+            value !== undefined
+                ? `0x${(value as any).toString(16)}`
+                : DEFAULT_VALUE,
+        to: to,
+        data: data,
+        chainId: chainId ? chainId : undefined,
+        // EIP 1559
+        maxFeePerGas: maxFeePerGas ? `0x${(maxFeePerGas as any).toString(16)}` : undefined,
+        maxPriorityFeePerGas: maxPriorityFeePerGas ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : undefined,
+        // EIP 4844
+        maxFeePerBlobGas: maxFeePerBlobGas ? `0x${(maxFeePerBlobGas as any).toString(16)}` : undefined,
+        blobVersionedHashes: blobVersionedHashes ? blobVersionedHashes : undefined,
+        // EIP 2930
+        accessList: accessList ? accessList : undefined
+    };
+    
+    const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
+    let message : Uint8Array[] | Uint8Array = tx.getMessageToSign();
+    if(isLegacyTx(tx)){
+      message = RLP.encode(message);
+    }
+    return toHex(message);
   }
 
   private async getAbi(): Promise<ABI.Def> {
     if (!this.abi) {
-      const abiResponse = await this.readAPI.v1.chain.get_abi(this.telosContract)
-      this.abi = abiResponse.abi
+      const abiResponse = await this.readAPI.v1.chain.get_abi(this.telosContract);
+      this.abi = abiResponse.abi;
     }
 
-    return this.abi
+    return this.abi;
   }
 }

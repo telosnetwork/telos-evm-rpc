@@ -3,7 +3,7 @@ import {TelosEvmConfig} from "../../types";
 import Bloom from "../../bloom";
 import {
 	toChecksumAddress,
-	numToHex,
+	toHex,
 	removeZeroHexFromFilter,
 	buildLogsObject,
 	logFilterMatch,
@@ -12,8 +12,8 @@ import {
 	GENESIS_BLOCKS,
 	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed,
-	parsePanicReason, parseRevertReason, toOpname
-
+	parsePanicReason, parseRevertReason, toOpname,
+	minBN,
 } from "../../util/utils"
 import MyLogger from "../../logging";
 import moment from "moment";
@@ -41,6 +41,17 @@ const REVERT_FUNCTION_SELECTOR = '0x08c379a0'
 const REVERT_PANIC_SELECTOR = '0x4e487b71'
 
 const EOSIO_ASSERTION_PREFIX = 'assertion failure with message: '
+
+const MIN_PROTOCOL_BASE_FEE = 7;
+
+const HARDFORKS = {
+	41: {
+		london: 12_965_000,
+	},
+	40: {
+		london: 12_965_000,
+	},
+};
 
 @Struct.type('call')
 export class Call extends Struct {
@@ -126,15 +137,7 @@ class TransactionError extends Error {
 export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	const methods: Map<string, (params?: any) => Promise<any> | any> = new Map();
-	const decimalsBN = new BN('1000000000000000000');
-	const zeros = "0x0000000000000000000000000000000000000000";
-	const chainAddr = [
-		"0xb1f8e55c7f64d203c1400b9d8555d050f94adf39",
-		"0x9f510b19f1ad66f0dcf6e45559fab0d6752c1db7",
-		"0xb8e671734ce5c8d7dfbbea5574fa4cf39f7a54a4",
-		"0xb1d3fbb2f83aecd196f474c16ca5d9cffa0d0ffc",
-	];
-	const chainIds = [1, 3, 4, 42];
+	const decimalsBN = new BN('1000000000000000000'); 
 	const METAMASK_EXTENSION_ORIGIN = 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn';
 	const GAS_OVER_ESTIMATE_MULTIPLIER = 1.25;
 
@@ -201,12 +204,25 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
     }
 
 	async function getVRS(receiptDoc): Promise<any> {
-		let receipt = receiptDoc["@raw"];
+		const receipt = receiptDoc["@raw"];
 		const v = removeLeftZeros(BigInt(receipt.v).toString(16), true);
 		const r = removeLeftZeros(receipt.r, true);
 		const s = removeLeftZeros(receipt.s, true);
 
 		return {v,r,s};
+	}
+	
+	async function getCumulativeGasUsed(blockHash, index, client){
+		let cumulativeGasUsed = 0;
+		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
+		if(receipts.length === 0){
+			Logger.error(client.ip + " Could not find receipts for block hash " + blockHash);
+			return null;
+		}
+		for (let i = 0; i < (index + 1); i++) {
+			cumulativeGasUsed += receipts[i]['gasused'];
+		}
+		return cumulativeGasUsed;
 	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
@@ -331,17 +347,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
-
-		return Object.assign({}, BLOCK_TEMPLATE, {
+		let block = Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
 			parentHash: parentHash,
 			hash: blockHash,
 			logsBloom: addHexPrefix(new Bloom().bitvector.toString("hex")),
 			number: blockNumberHex,
+			baseFeePerGas: await fastify.evm.getGasPrice(), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
 			timestamp: removeLeftZeros(timestamp?.toString(16)),
 			transactions: [],
 			extraData: extraData
 		});
+
+		if(blockDelta['@baseFeePerGas']){
+			block = Object.assign({}, block, {
+				baseFeePerGas: removeLeftZeros(toHex(blockDelta['@baseFeePerGas']))
+			})
+		}
+		return block;
 	}
 
 	async function emptyBlockFromNumber(blockNumber: number) {
@@ -368,7 +391,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 				}
 			});
-			let blockDelta = results?.hits?.hits[0]?._source;
+			const blockDelta = results?.hits?.hits[0]?._source;
 			if (!blockDelta) {
 				return null;
 			}
@@ -383,43 +406,50 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function reconstructBlockFromReceipts(receipts: any[], full: boolean, client: any) {
 		try {
-			let blockHash;
+			let blockHash: string;
 			let blockHex: string;
 			let blockNum: number;
 			let logsBloom: any = null;
 			let bloom = new Bloom();
+			let block: any;
+			let hexGasPrice : string; 
+
 			const trxs = [];
-			//Logger.debug(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
+			//console.log(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
-
-				if (!blockHash) {
-					blockHash = addHexPrefix(receipt['block_hash']);
-				}
-				if (!blockHex) {
+				if(!block){
 					blockNum = Number(receipt['block']);
 					blockHex = addHexPrefix(blockNum.toString(16));
+					blockHash = addHexPrefix(receipt['block_hash']);
+					block = await getDeltaDocFromNumber(blockNum);
+					if(!block){
+						Logger.error("Could not find block for receipts");
+						return null;
+					}
 				}
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
 				let finalFrom = toChecksumAddress(receipt['from']);
+				hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 				if (!full) {
 					trxs.push(receipt['hash']);
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
-					const hexGas = removeLeftZeros(numToHex(receipt['gas_limit']));
-					const hexGasPrice = removeLeftZeros(numToHex(receipt['charged_gas_price']));
-					const hexNonce = removeLeftZeros(numToHex(receipt['nonce']));
-					const hexTransactionIndex = removeLeftZeros(numToHex(receipt['trx_index']));
+					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
+					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
+					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
-					trxs.push({
+					// Legacy
+					let data = {
 						blockHash: blockHash,
 						blockNumber: hexBlockNum,
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
+						effectiveGasPrice: hexGasPrice,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -427,14 +457,35 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						transactionIndex: hexTransactionIndex,
 						value: hexValue,
 						v, r, s
-					});
+					};
+					if(receipt['access_list']){
+						data = Object.assign({}, data, {
+							accessList: receipt['access_list']
+						})
+					}
+					if(receipt['type']){
+						data = Object.assign({}, data, {
+							type: receipt['type']
+						})
+					}
+					let isEIP1559 : boolean = false;
+					if(receipt['max_fee_per_gas']){
+						isEIP1559 = true;
+						data = Object.assign({}, data, {
+							maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas']))
+						})
+					}
+					if(receipt['max_priority_fee_per_gas']){
+						isEIP1559 = true;
+						data = Object.assign({}, data, {
+							maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
+						})
+					}
+					if(isEIP1559){
+						data.effectiveGasPrice = removeLeftZeros(minBN([BN(receipt['charged_gas_price']) + BN(receipt['max_priority_fee_per_gas']), BN(receipt['max_fee_per_gas'])]).toString('hex'));
+					}
+					trxs.push(data);
 				}
-			}
-
-			const block = await getDeltaDocFromNumber(blockNum);
-			if(!block){
-				Logger.error("Could not find block for receipts");
-				return null;
 			}
 			const timestamp = new Date(block['@timestamp']).getTime() / 1000;
 			const gasUsedBlock = addHexPrefix(removeLeftZeros(new BN(block['gasUsed']).toString('hex')));
@@ -442,9 +493,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const blockSize = addHexPrefix(block['size'].toString(16));
 			const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
 
-			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
+			// If we didn't get the gas price from transactions (ie: no transactions on block) we get the current gas price
+			// This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data, i
+			// It means we shouldn't change our fixed gas price before 2.0 replaces all of this else historical data on empty blocks will be wrong and show current gas price instead of the one at the time block was written
+			if(hexGasPrice === null){
+				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
+			}
 
-			return Object.assign({}, BLOCK_TEMPLATE, {
+			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
+			let blockObj = Object.assign({
 				gasUsed: gasUsedBlock,
 				gasLimit: BLOCK_GAS_LIMIT,
 				parentHash: parentHash,
@@ -455,10 +512,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				transactions: trxs,
 				size: blockSize,
 				extraData: extraData,
-
+				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
-			});
+			}, BLOCK_TEMPLATE);
+			return blockObj;
 		} catch (e) {
 			Logger.error(client.ip + JSON.stringify(e));
 			return null;
@@ -468,12 +526,17 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getReceiptsByTerm(term: string, value: any) {
 		const termStruct = {};
 		termStruct[term] = value;
-		const results = await fastify.elastic.search({
-			index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
-			size: 2000,
-			query: { bool: { must: [{ term: termStruct }] } }
-		});
-		return results?.hits?.hits;
+		try {
+			const results = await fastify.elastic.search({
+				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
+				size: 2000,
+				query: { bool: { must: [{ term: termStruct }] } }
+			});
+			return results?.hits?.hits;
+		} catch (e) {
+			Logger.error("Error getting receipt");
+			throw(e);
+		}
 	}
 
 	async function getCurrentBlockNumber(indexed: boolean = false, retry: number = 0) {
@@ -542,7 +605,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	function makeInitialTrace(receipt, adHoc) {
-		let gas = addHexPrefix((receipt['gasused'] as number).toString(16));
+		const gas = addHexPrefix((receipt['gasused'] as number).toString(16));
 		let subtraces = 0;
 		for(let i = 0; i < receipt.itxs.length; i++){
 			if(receipt.itxs[i].traceAddress.length === 1){
@@ -830,11 +893,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			delete txParams.input;
 		}
 
-		const encodedTx = await fastify.evm.createEthTx({
-			...txParams,
+		const encodedTx : string = await fastify.evm.createEthTx({
 			sender: txParams.from,
-			gasPrice: 10000000000000000,
-			gasLimit: 10000000000000000
+			gasPrice: await fastify.evm.getGasPrice(),
+			gasLimit: 10000000000000000,
+			...txParams
 		});
 
 		try {
@@ -858,7 +921,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				throw err;
 			}
 
-			let toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
+			const toReturn = `${Math.ceil((parseInt(gas, 16) * GAS_OVER_ESTIMATE_MULTIPLIER)).toString(16)}`;
 			Logger.debug(`From contract, gas estimate is ${gas}, with multiplier returning ${toReturn}`)
 			return removeLeftZeros(toReturn);
 		} catch (e) {
@@ -880,7 +943,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let err = new TransactionError('Transaction reverted');
 		err.data = receipt.output;
 
-		let output = addHexPrefix(receipt.output);
+		const output = addHexPrefix(receipt.output);
 
 		if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 			err.errorMessage = `execution reverted: ${parseRevertReason(output)}`;
@@ -889,7 +952,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		} else {
 			if(receipt.errors.length > 0){
 				err.errorMessage = `execution reverted: `;
-				for(let i in receipt.errors){
+				for(const i in receipt.errors){
 					err.errorMessage += receipt.errors[i] + ', ';
 				}
 				err.errorMessage = err.errorMessage.slice(0, -2);
@@ -910,8 +973,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         if (cachedData) {
             return cachedData;
         } else {
-            let price = await fastify.evm.getGasPrice();
-            let priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
+            const price = await fastify.evm.getGasPrice();
+            const priceInt = parseInt(price, 16) * GAS_PRICE_OVERESTIMATE;
             const gasPrice = isNaN(priceInt) ? null : removeLeftZeros(Math.floor(priceInt).toString(16));
             fastify.redis.set(key, gasPrice, {
 				PX: 500
@@ -973,7 +1036,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			value: _value.toHexString().replace(/^0x/, ''),
 			sender: txParams.from,
 		};
-		let tx = await fastify.evm.createEthTx(obj);
+		let tx : string = await fastify.evm.createEthTx(obj);
 		let sender = txParams.from
 
 		if (tx && isHexPrefixed(tx)) tx = tx.substring(2)
@@ -1013,7 +1076,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			})
 			// const sendResult = await fastify.readApi.v1.chain.push_transaction(signedTransaction)
 			// const sendResult = await fastify.readApi.v1.chain.send_transaction2(signedTransaction)
-			const sendResult = await fastify.readApi.v1.chain.send_transaction(signedTransaction) as any
+			await fastify.readApi.v1.chain.send_transaction(signedTransaction);
 		} catch (e) {
 			const error = e.response.json.error
 			if (error.code !== 3050003) {
@@ -1047,8 +1110,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return leftPadZerosEvenBytes(result);
 			}
 
-			let defaultMessage = `Server error during call: ${e.message}`
-			throw new Error(defaultMessage)
+			throw new Error(`Server error during call: ${e.message}`)
 		}
 	});
 
@@ -1058,7 +1120,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
 		try {
-			const rawResponse = await fastify.evm.raw({
+			const response = await fastify.evm.raw({
 				account: opts.signerAccount,
 				tx: signedTx,
 				ram_payer: fastify.evm.telosContract,
@@ -1066,13 +1128,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				getInfoResponse: await getInfo()
 			});
 
-			let consoleOutput = rawResponse.telos.processed.action_traces[0].console;
-
-			let receiptLog = consoleOutput.slice(consoleOutput.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, consoleOutput.indexOf(RECEIPT_LOG_END));
-			let receipt = JSON.parse(receiptLog);
+			const receiptLog = response.output.slice(response.output.indexOf(RECEIPT_LOG_START) + RECEIPT_LOG_START.length, response.output.indexOf(RECEIPT_LOG_END));
+			const receipt = JSON.parse(receiptLog);
 			if (receipt.status === 0) {
-				let err = new TransactionError('Transaction error');
-				let output = addHexPrefix(receipt.output);
+				const err = new TransactionError('Transaction error');
+				const output = addHexPrefix(receipt.output);
 				if (output.startsWith(REVERT_FUNCTION_SELECTOR)) {
 					err.errorMessage = `VM Exception while processing transaction: reverted with reason string: ${parseRevertReason(output)}`;
 				} else if (output.startsWith(REVERT_PANIC_SELECTOR)) {
@@ -1084,14 +1144,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					else
 						err.errorMessage = `VM Exception while processing transaction: ${receipt?.errors[0]}`;
 				}
-
 				err.data = {
-					txHash: addHexPrefix(rawResponse.eth.transactionHash)
+					txHash: addHexPrefix(response.transactionHash)
 				};
 				throw err;
 			}
 
-			return addHexPrefix(rawResponse.eth.transactionHash);
+			return addHexPrefix(response.transactionHash);
 		} catch (e) {
 			if (opts.orderNonces) {
 				const assertionMessage = e?.response?.json?.error?.details[0]?.message
@@ -1126,10 +1185,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (!receiptAction) return null;
 			const receipt = receiptAction['@raw'];
 
-			//Logger.debug(`get transaction receipt got ${JSON.stringify(receipt)}`)
 			const _blockHash = addHexPrefix(receipt['block_hash']);
-			const _blockNum = numToHex(receipt['block']);
-			const _gas = numToHex(receipt['gasused']);
+			const _blockNum = toHex(receipt['block']);
+			const _gas = toHex(receipt['gasused']);
 			let _contractAddr = null;
 			if (receipt['createdaddr']) {
 				_contractAddr = addHexPrefix(receipt['createdaddr']);
@@ -1138,29 +1196,53 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if (receipt['logsBloom']) {
 				_logsBloom = addHexPrefix(receipt['logsBloom']);
 			}
-
-			return {
+		
+			let data = {
 				blockHash: _blockHash,
-				blockNumber: removeLeftZeros(numToHex(receipt['block'])),
+				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
-				cumulativeGasUsed: removeLeftZeros(_gas),
+				cumulativeGasUsed: getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index'], client),
+				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
-				status: removeLeftZeros(numToHex(receipt['status'])),
+				status: removeLeftZeros(toHex(receipt['status'])),
 				to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 				transactionHash: receipt['hash'],
-				transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
+				transactionIndex: removeLeftZeros(toHex(receipt['trx_index'])),
 				logs: buildLogsObject(
 					receipt['logs'],
 					_blockHash,
 					_blockNum,
 					receipt['hash'],
-					numToHex(receipt['trx_index'])
+					toHex(receipt['trx_index'])
 				),
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
-			};
+			}
+			// EIP 1559
+			if(receipt['max_fee_per_gas']){
+				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
+				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
+				const effectiveGasPrice = Math.min(MIN_PROTOCOL_BASE_FEE  + receipt['max_priority_fee_per_gas'] - MIN_PROTOCOL_BASE_FEE, receipt['max_fee_per_gas']);
+				data = Object.assign({
+					effectiveGasPrice: removeLeftZeros(toHex(effectiveGasPrice)),
+					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
+					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
+				}, data, {})
+			}
+			// EIP 4844
+			// got maxFeePerBlobGas & blobVersionedHashes
+			if(receipt['max_fee_per_blob_gas']){
+				// need blobGasUsed & blobGasPrice
+			}
+			// EIP 2718
+			if(receipt['type']){
+				data = Object.assign({
+					type: receipt['type']
+				}, data, {})
+			}
+			return data;
 		} else {
 			return null;
 		}
@@ -1176,28 +1258,54 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const {v, r, s} = await getVRS(receiptAction);
 		const receipt = receiptAction['@raw'];
 
-		// lookup receipt delta
-		//const receiptDelta = await searchDeltasByHash(trxHash);
-		//if (!receiptDelta) return null;
-		//const receipt = receiptDelta['@receipt'];
-
 		const _blockHash = addHexPrefix(receipt['block_hash']);
-		const _blockNum = numToHex(receipt['block']);
-		return {
+		const _blockNum = toHex(receipt['block']);
+		let data = {
 			blockHash: _blockHash,
 			blockNumber: removeLeftZeros(_blockNum),
 			from: toChecksumAddress(receipt['from']).toLowerCase(),
-			gas: removeLeftZeros(numToHex(receipt.gas_limit)),
-			gasPrice: removeLeftZeros(numToHex(receipt.charged_gas_price)),
+			gas: removeLeftZeros(toHex(receipt.gas_limit)),
 			hash: receipt['hash'],
 			input: receipt['input_data'],
-			nonce: removeLeftZeros(numToHex(receipt['nonce'])),
+			nonce: removeLeftZeros(toHex(receipt['nonce'])),
 			to: toChecksumAddress(receipt['to'])?.toLowerCase(),
-			transactionIndex: removeLeftZeros(numToHex(receipt['trx_index'])),
+			transactionIndex: removeLeftZeros(toHex(receipt['trx_index'])),
 			value: removeLeftZeros(receipt['value']),
 			v: removeLeftZeros(v),
 			r, s
 		};
+		if(receipt['type']){
+			data = Object.assign({
+				type: receipt['type']
+			}, data, {})
+		}
+		if(receipt['access_list']){
+			data = Object.assign({
+				accessList: receipt['access_list']
+			}, data, {})
+		}
+		if(receipt['chain_id']){
+			data = Object.assign({
+				chainId: receipt['chain_id']
+			}, data, {})
+		}
+		if(receipt.charged_gas_price){
+			data = Object.assign({
+				gasPrice: receipt.charged_gas_price,
+				effectiveGasPrice: receipt.charged_gas_price
+			}, data, {})
+		}
+		if(receipt['max_fee_per_gas']){
+			data = Object.assign({
+				maxFeePerGas: receipt['max_fee_per_gas']
+			}, data, {})
+		}
+		if(receipt['max_priority_fee_per_gas']){
+			data = Object.assign({
+				maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
+			}, data, {})
+		}
+		return receipt;
 	});
 
 	/**
@@ -1214,9 +1322,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if(!block || block.transactions?.length === 0) return null; 
 		const trxIndex = parseInt(trxIndexHex, 16);
 		if(!block.transactions[trxIndex]) return null; 
-		let trx = block.transactions[trxIndex];
-		trx.type = "0x0"; // TODO: Determine type with 1559
-		trx.chainId = CHAIN_ID_HEX;
+		const trx = block.transactions[trxIndex];
 		return trx;
 	});
 
@@ -1335,9 +1441,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			queryBody.bool.must.push({ term: { "@raw.block_hash": blockHash } })
 		} else {
 
-			let fromBlockExplicit = await toBlockNumber(params.fromBlock || 'latest');
+			const fromBlockExplicit = await toBlockNumber(params.fromBlock || 'latest');
 			fromBlock = typeof(fromBlockExplicit) == 'string' ? parseInt(fromBlockExplicit, 16) : fromBlockExplicit;
-			let toBlockExplicit = await toBlockNumber(params.toBlock || 'latest')
+			const toBlockExplicit = await toBlockNumber(params.toBlock || 'latest')
 			toBlock = typeof(toBlockExplicit) == 'string' ? parseInt(toBlockExplicit, 16) : toBlockExplicit;
 
 			/*
@@ -1396,7 +1502,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					return;
 
 				//console.debug(`topic: ${topic}`);
-				let trimmed = removeZeroHexFromFilter(topic, false);
+				const trimmed = removeZeroHexFromFilter(topic, false);
 				//console.debug(`topic trimmed: ${trimmed}`);
 
 				if (Array.isArray(trimmed)) {
@@ -1469,15 +1575,15 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Check the eth_getlogs function above for help
 	 */
     methods.set('trace_filter', async ([parameters, client]) => {
-        let params = await parameters;
+        const params = await parameters;
         const run = async function(paramObject){
             const results = [];
-            let fromAddress = paramObject.fromAddress;
-            let toAddress = paramObject.toAddress;
-            let fromBlock: string | number = parseInt(await toBlockNumber(paramObject.fromBlock), 16);
-            let toBlock: string | number = parseInt(await toBlockNumber(paramObject.toBlock), 16);
-            let after:  number = paramObject.after; //TODO what is this?
-            let count: number = paramObject.count;
+            const fromAddress = paramObject.fromAddress;
+            const toAddress = paramObject.toAddress;
+            const fromBlock: string | number = parseInt(await toBlockNumber(paramObject.fromBlock), 16);
+            const toBlock: string | number = parseInt(await toBlockNumber(paramObject.toBlock), 16);
+            const after:  number = paramObject.after; //TODO what is this?
+            const count: number = paramObject.count;
 
             if (typeof fromAddress !== 'undefined') {
                 fromAddress.forEach((addr, index) => fromAddress[index] = toChecksumAddress(addr).slice(2).replace(/^0+/, '').toLowerCase());
@@ -1568,7 +1674,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
             return results;
         }
         if(Array.isArray(params)){
-            const results = [];
+            let results = [];
             for (const param_obj of params) {
                 results.concat(run(param_obj));
             }
@@ -1655,7 +1761,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		})
 		let transactions = []
 		for (let i = 0; i < sortedReceipts.length; i++) {
-			let receipt = sortedReceipts[i];
+			const receipt = sortedReceipts[i];
 			let trx: any = makeTraces(receipt, true);
 			trx.transactionHash = receipt.hash;
 			transactions.push(trx);
@@ -1673,15 +1779,53 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		})
 		let traces = []
 		for (let i = 0; i < sortedReceipts.length; i++) {
-			let receipt = sortedReceipts[i];
+			const receipt = sortedReceipts[i];
 			let trxTraces: any = makeTraces(receipt, false);
 			traces.concat(traces, trxTraces);
 		}
 		return traces;
 	});
 
+	// EIP 1559
+	methods.set('eth_feeHistory', async ([]) => {
+		// 2.0 
+		throw new Error("eth_feeHistory is not supported yet");
+	});
 
-	/*
+	methods.set('eth_maxPriorityFeePerGas', async ([]) => {
+		// As our miners are on Antelope they do not need this fee, so we return the minimum (1) as max
+		return '0x01';
+	});
+
+	// EIP 4844
+	methods.set('eth_blobBaseFee', async ([]) => {
+		// TODO
+		throw new Error("eth_blobBaseFee is not supported yet");
+	});
+
+	// EIP 2930
+	methods.set('eth_createAccessList', async ([trx, block]) => {
+		// CreateAccessList creates an EIP-2930 type AccessList for the given transaction. Which means playing the transaction and getting all addresses and storage keys of those addresses the contract interacts with as well as the gas used
+		// We would need contract work to support this I think with a method that ultimately reverts the transaction with a custom reason and returns the access list AND gas estimation.
+		// Our method would look something like this:
+		// If the transaction itself fails, a vmErr is returned.
+		// Else we give back the accessList as well as gasUsed in a response which should look like this
+		// const response = {
+		// 	"accessList": [
+		//		 {
+		//		 	 "address": "0xa02457e5dfd32bda5fc7e1f1b008aa5979568150",
+		// 			 "storageKeys": [
+		//			 	"0x0000000000000000000000000000000000000000000000000000000000000081",
+		//			 ]
+		//		 }
+		//	 ],
+		//	 "gasUsed": "0x125f8"
+		// }
+		throw new Error("eth_createAccessList is not supported yet");
+	});
+
+
+	/*f
 	// TODO: once we understand what the index position is...
 	methods.set('trace_get', async ([block, indexPositions]) => {
 		const blockNumber = parseInt(await toBlockNumber(block), 16);
@@ -1711,7 +1855,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 
 	async function doRpcMethod(jsonRpcRequest: any, clientInfo, reply: any) {
 		let { jsonrpc, id, method, params } = jsonRpcRequest;
-		let { usage, limit, origin, ip } = clientInfo;
+		const { usage, limit, origin, ip } = clientInfo;
 		if(!params || !Array.isArray(params)){
 			params = [];
 		}
@@ -1758,10 +1902,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				return { jsonrpc, id, result };
 			} catch (e) {
 				if (e instanceof TransactionError) {
-					let code = e.code || 3;
-					let message = e.errorMessage?.replace(/\0.*$/g,'');;
-					let data = e.data;
-					let error = { code, data, message };
+					const code = e.code || 3;
+					const message = e.errorMessage?.replace(/\0.*$/g,'');;
+					const error = { code, data: e?.data, message };
 					Logger.error(`RPCREVERT: ${new Date().toISOString()} - ${ip} | Method: ${method} | VM execution error, reverted with message: ${e.errorMessage} \n\n REQ: ${JSON.stringify(params)}\n\n ERROR RESP: ${JSON.stringify(error)}`);
 					return { jsonrpc, id, error };
 				}
@@ -1801,7 +1944,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				let promise = doRpcMethod(payload[i], clientInfo, reply);
 				promises.push(promise);
 			}
-			let responses = await Promise.all(promises);
+			const responses = await Promise.all(promises);
 
 			const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
 			Logger.log(`RPCREQUESTBATCH: ${new Date().toISOString()} - ${duration} μs - ${ip} (${usage}/${limit}) - ${origin} - BATCH OF ${responses.length}`);

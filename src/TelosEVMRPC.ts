@@ -1,7 +1,7 @@
 import {fastify, FastifyInstance, FastifyListenOptions} from "fastify";
 import fastifyTraps from '@dnlup/fastify-traps'
 import fastifyCors from '@fastify/cors'
-import Common, {default as ethCommon} from '@ethereumjs/common';
+import {Chain, Common, Hardfork} from '@ethereumjs/common';
 import {createLogger} from "./util/logger";
 import evmRoute from './routes/evm'
 import {RedisClientConnection, TelosEvmConfig} from "./types";
@@ -24,9 +24,9 @@ const logger = createLogger(`telos-evm-rpc`)
 export default class TelosEVMRPC {
     debug = false;
 
-    common: Common;
+    common: any;
     baseChain = 'mainnet';
-    hardfork = 'istanbul';
+    hardfork = Hardfork.London;
     fastify: FastifyInstance;
     config: TelosEvmConfig;
     websocketRPC: WebsocketRPC
@@ -35,11 +35,10 @@ export default class TelosEVMRPC {
         this.config = config
         this.debug = config.debug
         if (config.chainId) {
-            this.common = ethCommon.forCustomChain(
-                this.baseChain,
-                {chainId: config.chainId},
-                this.hardfork
-            );
+            this.common = Common.custom({chainId: config.chainId}, {
+              hardfork: Hardfork.London,
+              eips: [1559]
+            });
         }
 
         this.fastify = fastify({

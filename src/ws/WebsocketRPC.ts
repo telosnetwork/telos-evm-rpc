@@ -5,7 +5,6 @@ import {TelosEvmConfig} from "../types";
 import Subscription from "./Subscription";
 import LogSubscription from "./LogSubscription";
 import {createLogger} from "../util/logger";
-import {BigNumber} from 'ethers';
 
 const NEW_HEADS_SUBSCRIPTION = "0x9ce59a13059e417087c02d3236a0b1cd"
 const logger = createLogger('telos-evm-rpc-ws');
