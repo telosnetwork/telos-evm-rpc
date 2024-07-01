@@ -213,7 +213,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 	
 	async function getCumulativeGasUsed(blockHash, index, client){
-		// We need to get block receipts and sum gasUsed until we reach the transaction indexx
 		let cumulativeGasUsed = 0;
 		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
 		if(receipts.length === 0){
@@ -221,7 +220,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return null;
 		}
 		for (let i = 0; i < (index + 1); i++) {
-			cumulativeGasUsed += receipts[i]['gas_used'];
+			cumulativeGasUsed += receipts[i]['gasused'];
 		}
 		return cumulativeGasUsed;
 	}
@@ -536,12 +535,18 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getReceiptsByTerm(term: string, value: any) {
 		const termStruct = {};
 		termStruct[term] = value;
-		const results = await fastify.elastic.search({
-			index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
-			size: 2000,
-			query: { bool: { must: [{ term: termStruct }] } }
-		});
-		return results?.hits?.hits;
+		console.log(termStruct);
+		try {
+			const results = await fastify.elastic.search({
+				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
+				size: 2000,
+				query: { bool: { must: [{ term: termStruct }] } }
+			});
+			return results?.hits?.hits;
+		} catch (e) {
+			Logger.error("Error getting receipt");
+			throw(e);
+		}
 	}
 
 	async function getCurrentBlockNumber(indexed: boolean = false, retry: number = 0) {
