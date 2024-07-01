@@ -216,9 +216,12 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		// We need to get block receipts and sum gasUsed until we reach the transaction indexx
 		let cumulativeGasUsed = 0;
 		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
-		const block = receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, true, client) : await emptyBlockFromHash(blockHash);
-		for (let i = 0; i < index; i++) {
-			cumulativeGasUsed += block['transactions'][i]['gasUsed'];
+		if(receipts.length === 0){
+			Logger.error(client.ip + " Could not find receipts for block hash " + blockHash);
+			return null;
+		}
+		for (let i = 0; i < (index + 1); i++) {
+			cumulativeGasUsed += receipts[i]['gas_used'];
 		}
 		return cumulativeGasUsed;
 	}
