@@ -503,7 +503,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			console.log(`Trx parsed: ${JSON.stringify(trxs)}`)
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
-			let blockObj = Object.assign(BLOCK_TEMPLATE, {
+			let blockObj = Object.assign({
 				gasUsed: gasUsedBlock,
 				gasLimit: BLOCK_GAS_LIMIT,
 				parentHash: parentHash,
@@ -517,7 +517,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
-			});
+			}, BLOCK_TEMPLATE);
 			if(this.debug){
 				console.log(blockObj);
 			}
