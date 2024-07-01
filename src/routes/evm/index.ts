@@ -347,7 +347,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
-		console.log(blockDelta);
 		let block = Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
 			parentHash: parentHash,
@@ -416,12 +415,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let hexGasPrice : string; 
 
 			const trxs = [];
-			console.log(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
+			//console.log(`Reconstructing block from receipts: ${JSON.stringify(receipts)}`)
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
 				if(!block){
-					console.log("Getting block from receipt")
 					blockNum = Number(receipt['block']);
 					blockHex = addHexPrefix(blockNum.toString(16));
 					blockHash = addHexPrefix(receipt['block_hash']);
@@ -501,8 +499,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(hexGasPrice === null){
 				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
 			}
-			console.log(`Trx parsed: ${JSON.stringify(trxs)}`)
-			console.log(`Block parsed: ${JSON.stringify(block)}`)
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
 			let blockObj = Object.assign({
@@ -520,7 +516,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			}, BLOCK_TEMPLATE);
-			console.log(blockObj);
 			return blockObj;
 		} catch (e) {
 			Logger.error(client.ip + JSON.stringify(e));
@@ -531,7 +526,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	async function getReceiptsByTerm(term: string, value: any) {
 		const termStruct = {};
 		termStruct[term] = value;
-		console.log(termStruct);
 		try {
 			const results = await fastify.elastic.search({
 				index: `${opts.elasticIndexPrefix}-action-${opts.elasticIndexVersion}-*`,
