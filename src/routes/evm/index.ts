@@ -421,6 +421,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
 				if(!block){
+					console.log("Getting block from receipt")
 					blockNum = Number(receipt['block']);
 					blockHex = addHexPrefix(blockNum.toString(16));
 					blockHash = addHexPrefix(receipt['block_hash']);
@@ -501,6 +502,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
 			}
 			console.log(`Trx parsed: ${JSON.stringify(trxs)}`)
+			console.log(`Block parsed: ${JSON.stringify(block)}`)
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
 			let blockObj = Object.assign({
@@ -518,9 +520,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
 			}, BLOCK_TEMPLATE);
-			if(this.debug){
-				console.log(blockObj);
-			}
+			console.log(blockObj);
 			return blockObj;
 		} catch (e) {
 			Logger.error(client.ip + JSON.stringify(e));
