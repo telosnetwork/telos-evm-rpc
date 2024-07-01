@@ -420,30 +420,26 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			for (const receiptDoc of receipts) {
 				const {v, r, s} = await getVRS(receiptDoc._source);
 				const receipt = receiptDoc._source['@raw'];
-				if (!blockHex) {
+				if(!block){
 					blockNum = Number(receipt['block']);
 					blockHex = addHexPrefix(blockNum.toString(16));
-				}
-				if(!block){
+					blockHash = addHexPrefix(receipt['block_hash']);
 					block = await getDeltaDocFromNumber(blockNum);
 					if(!block){
 						Logger.error("Could not find block for receipts");
 						return null;
 					}
 				}
-				if (!blockHash) {
-					blockHash = addHexPrefix(receipt['block_hash']);
-				}
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
 				let finalFrom = toChecksumAddress(receipt['from']);
+				hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 				if (!full) {
 					trxs.push(receipt['hash']);
 				} else {
 					const hexBlockNum = removeLeftZeros(blockHex);
 					const hexGas = removeLeftZeros(toHex(receipt['gas_limit']));
-					hexGasPrice = removeLeftZeros(toHex(receipt['charged_gas_price']));
 					const hexNonce = removeLeftZeros(toHex(receipt['nonce']));
 					const hexTransactionIndex = removeLeftZeros(toHex(receipt['trx_index']));
 					const hexValue = addHexPrefix(receipt['value']);
@@ -507,7 +503,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			console.log(`Trx parsed: ${JSON.stringify(trxs)}`)
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
-			let blockObj = Object.assign({}, BLOCK_TEMPLATE, {
+			let blockObj = Object.assign({
 				gasUsed: gasUsedBlock,
 				gasLimit: BLOCK_GAS_LIMIT,
 				parentHash: parentHash,
@@ -521,7 +517,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
-			});
+			}, BLOCK_TEMPLATE);
 			if(this.debug){
 				console.log(blockObj);
 			}
@@ -1370,7 +1366,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a block by hash.
 	 */
 	methods.set('eth_getBlockByHash', async ([hash, full, client]) => {
-		console.log("HEY");
 		let _hash = hash.toLowerCase();
 		if (_hash === GENESIS_BLOCK_HASH)
 			return GENESIS_BLOCK;
@@ -1378,9 +1373,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
-		console.log("HEYHEY");
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
-		console.log(receipts);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
 	});
 
