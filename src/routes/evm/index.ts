@@ -347,14 +347,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
         const parentHash = addHexPrefix(blockDelta['@evmPrevBlockHash']);
 		const blockHash = addHexPrefix(blockDelta["@evmBlockHash"]);
 		const extraData = addHexPrefix(blockDelta['@blockHash']);
-
+		console.log(blockDelta);
 		let block = Object.assign({}, BLOCK_TEMPLATE, {
 			gasUsed: "0x0",
 			parentHash: parentHash,
 			hash: blockHash,
 			logsBloom: addHexPrefix(new Bloom().bitvector.toString("hex")),
 			number: blockNumberHex,
-			baseFeePerGas: MIN_PROTOCOL_BASE_FEE,
+			baseFeePerGas: await fastify.evm.getGasPrice(), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
 			timestamp: removeLeftZeros(timestamp?.toString(16)),
 			transactions: [],
 			extraData: extraData
@@ -1377,7 +1377,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
+		console.log("HEY");
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
+		console.log(receipts);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
 	});
 
