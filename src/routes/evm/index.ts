@@ -1370,6 +1370,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a block by hash.
 	 */
 	methods.set('eth_getBlockByHash', async ([hash, full, client]) => {
+		console.log("HEY");
 		let _hash = hash.toLowerCase();
 		if (_hash === GENESIS_BLOCK_HASH)
 			return GENESIS_BLOCK;
@@ -1377,7 +1378,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if (isHexPrefixed(_hash)) {
 			_hash = _hash.slice(2);
 		}
-		console.log("HEY");
+		console.log("HEYHEY");
 		const receipts = await getReceiptsByTerm("@raw.block_hash", _hash);
 		console.log(receipts);
 		return receipts.length > 0 ? await reconstructBlockFromReceipts(receipts, full, client) : await emptyBlockFromHash(_hash);
