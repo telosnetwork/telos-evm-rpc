@@ -212,18 +212,19 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return {v,r,s};
 	}
 	
-	async function getCumulativeGasUsed(blockHash, index, client){
+	async function getCumulativeGasUsed(blockHash, index){
 		let cumulativeGasUsed = new BN('0');
 		const receiptHits = await getReceiptsByTerm("@raw.block_hash", blockHash);
-		const receipts = receiptHits.map(r => r._source["@raw"]);
-		if(receipts.length === 0){
-			console.log(client.ip + " Could not find receipts for block hash " + blockHash);
+		if(receiptHits.length === 0){
+			console.log("Could not find receipts for block hash " + blockHash);
 			return null;
 		}
-		for (let i = 0; i < (index + 1); i++) {
-			cumulativeGasUsed.iadd(new BN(receipts[i]['gasused']));
-		}
-		return cumulativeGasUsed.toJSON();
+		const receipts = receiptHits.map(r => r._source["@raw"]);
+		cumulativeGasUsed = receipts.reduce((acc, receipt, i) => {	
+			return acc.add(new BN(receipt.gasused));
+		})
+		console.log(cumulativeGasUsed);
+		return removeLeftZeros(cumulativeGasUsed.toJSON());
 	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
@@ -1202,7 +1203,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
-				cumulativeGasUsed: getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index'], client),
+				cumulativeGasUsed: getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index']),
 				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
