@@ -213,14 +213,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 	
 	async function getCumulativeGasUsed(blockHash, index, client){
-		let cumulativeGasUsed = 0;
+		let cumulativeGasUsed = BN(0);
 		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
 		if(receipts.length === 0){
 			Logger.error(client.ip + " Could not find receipts for block hash " + blockHash);
 			return null;
 		}
 		for (let i = 0; i < (index + 1); i++) {
-			cumulativeGasUsed += receipts[i]['gasused'];
+			cumulativeGasUsed += BN(receipts[i]['gasused']);
 		}
 		return cumulativeGasUsed;
 	}
