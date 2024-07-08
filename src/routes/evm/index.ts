@@ -221,7 +221,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		const receipts = receiptHits.map(r => r._source["@raw"]);
 		cumulativeGasUsed = receipts.reduce((acc, receipt, i) => {	
-			return acc.iadd(new BN(receipt.gasused));
+			return acc.add(new BN(receipt.gasused));
 		})
 		console.log(cumulativeGasUsed);
 		return removeLeftZeros(cumulativeGasUsed.toString(16));
