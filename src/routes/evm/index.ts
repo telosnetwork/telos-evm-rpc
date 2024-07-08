@@ -221,10 +221,10 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		const receipts = receiptHits.map(r => r._source["@raw"]);
 		cumulativeGasUsed = receipts.reduce((acc, receipt, i) => {	
-			return acc.add(new BN(receipt.gasused));
+			return acc.iadd(new BN(receipt.gasused));
 		})
 		console.log(cumulativeGasUsed);
-		return removeLeftZeros(cumulativeGasUsed.toJSON());
+		return removeLeftZeros(cumulativeGasUsed.toString(16));
 	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
