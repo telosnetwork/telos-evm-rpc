@@ -214,15 +214,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	
 	async function getCumulativeGasUsed(blockHash, index, client){
 		let cumulativeGasUsed = new BN('0');
-		const receipts = await getReceiptsByTerm("@raw.block_hash", blockHash);
+		const receiptHits = await getReceiptsByTerm("@raw.block_hash", blockHash);
+		const receipts = receiptHits.map(r => r._source["@raw"]);
 		if(receipts.length === 0){
 			console.log(client.ip + " Could not find receipts for block hash " + blockHash);
 			return null;
 		}
 		for (let i = 0; i < (index + 1); i++) {
-			cumulativeGasUsed.iadd(new BN(receipts[i]['_source']['@raw']['gasused']));
+			cumulativeGasUsed.iadd(new BN(receipts[i]['gasused']));
 		}
-		return cumulativeGasUsed;
+		return cumulativeGasUsed.toJSON();
 	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
