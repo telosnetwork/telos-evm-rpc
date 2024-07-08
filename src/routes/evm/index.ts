@@ -220,8 +220,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return null;
 		}
 		for (let i = 0; i < (index + 1); i++) {
-			console.log(receipts[i]);
-			cumulativeGasUsed.iuadd(new BN(receipts[i]['_source']['@raw']['gasused']));
+			cumulativeGasUsed.iadd(new BN(receipts[i]['_source']['@raw']['gasused']));
 		}
 		return cumulativeGasUsed;
 	}
