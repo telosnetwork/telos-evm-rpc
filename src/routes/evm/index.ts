@@ -216,7 +216,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		let cumulativeGasUsed = new BN('0');
 		const receiptHits = await getReceiptsByTerm("@raw.block_hash", blockHash);
 		if(receiptHits.length === 0){
-			console.log("Could not find receipts for block hash " + blockHash);
+			Logger.error("Could not find receipts for block hash " + blockHash);
 			return null;
 		}
 		const receipts = receiptHits.map(r => r._source["@raw"]);
