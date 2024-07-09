@@ -1218,10 +1218,16 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					receipt['hash'],
 					toHex(receipt['trx_index'])
 				),
+				type: '0x0'
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
-			console.log(JSON.stringify(receipt));
+			// EIP 2718
+			if(receipt['access_list']){
+				data = Object.assign({
+					type: '0x1'
+				}, data, {})
+			}
 			// EIP 1559
 			if(receipt['max_fee_per_gas']){
 				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
@@ -1230,19 +1236,14 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				data = Object.assign({
 					effectiveGasPrice: removeLeftZeros(toHex(effectiveGasPrice)),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
-					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
+					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])),
+					type: '0x2'
 				}, data, {})
 			}
 			// EIP 4844
 			// got maxFeePerBlobGas & blobVersionedHashes
 			if(receipt['max_fee_per_blob_gas']){
 				// need blobGasUsed & blobGasPrice
-			}
-			// EIP 2718
-			if(receipt['type']){
-				data = Object.assign({
-					type: receipt['type']
-				}, data, {})
 			}
 			return data;
 		} else {
