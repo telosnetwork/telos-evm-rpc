@@ -480,6 +480,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
+						console.log(MIN_PROTOCOL_BASE_FEE);
+						console.log(receipt['max_fee_per_gas']);
+						console.log(receipt['max_priority_fee_per_gas'])
 						data = Object.assign({}, data, {
 							effectiveGasPrice: removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex'))
 						})
