@@ -223,8 +223,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		for(let i = 0; i < (index + 1); i++){
 			cumulativeGasUsed = cumulativeGasUsed.add(new BN(receipts[i].gasused));
 		}
-		console.log("CGU:" + cumulativeGasUsed.toString(16));
-		console.log("CGU:" + JSON.stringify(cumulativeGasUsed));
 		return removeLeftZeros('0x' + cumulativeGasUsed.toString(16));
 	}
 
