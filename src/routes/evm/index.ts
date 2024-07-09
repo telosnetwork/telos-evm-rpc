@@ -225,7 +225,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		console.log("CGU:" + cumulativeGasUsed.toString(16));
 		console.log("CGU:" + JSON.stringify(cumulativeGasUsed));
-		return removeLeftZeros(cumulativeGasUsed.toString(16));
+		return removeLeftZeros('0x' + cumulativeGasUsed.toString(16));
 	}
 
 	async function searchActionByHash(trxHash: string, client: any): Promise<any> {
@@ -1204,7 +1204,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
-				cumulativeGasUsed: getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index']),
+				cumulativeGasUsed: await getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index']),
 				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
