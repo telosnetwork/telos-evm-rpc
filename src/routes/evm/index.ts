@@ -466,11 +466,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 							type: '0x1'
 						})
 					}
-					if(receipt['type']){
-						data = Object.assign({}, data, {
-							type: receipt['type']
-						})
-					}
 					let isEIP1559 : boolean = false;
 					if(receipt['max_fee_per_gas']){
 						isEIP1559 = true;
@@ -480,13 +475,18 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 					}
 					if(receipt['max_priority_fee_per_gas']){
 						isEIP1559 = true;
-						data = Object.assign({}, data, {,
+						data = Object.assign({}, data, {
 							maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas']))
 						})
 					}
 					if(isEIP1559){
 						data.effectiveGasPrice = removeLeftZeros(minBN([BN(receipt['charged_gas_price']) + BN(receipt['max_priority_fee_per_gas']), BN(receipt['max_fee_per_gas'])]).toString('hex'));
 						data.type = '0x2';
+					}
+					if(receipt['type']){
+						data = Object.assign({}, data, {
+							type: receipt['type']
+						})
 					}
 					trxs.push(data);
 				}
