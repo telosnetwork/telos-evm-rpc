@@ -220,7 +220,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			return null;
 		}
 		const receipts = receiptHits.map(r => r._source["@raw"]);
-		for(let i = 0; i < receipts.length; i++){
+		for(let i = 0; i < (index + 1); i++){
 			cumulativeGasUsed = cumulativeGasUsed.add(new BN(receipts[i].gasused));
 		}
 		console.log("CGU:" + cumulativeGasUsed.toString(16));
