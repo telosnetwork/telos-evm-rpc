@@ -1233,7 +1233,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				console.log(receipt['max_fee_per_gas']);
 				console.log(receipt['max_priority_fee_per_gas']);
 				data = Object.assign({
-					effectiveGasPrice: removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex')),
+					effectiveGasPrice: removeLeftZeros((new BN(MIN_PROTOCOL_BASE_FEE) + minBN([new BN(receipt['max_fee_per_gas']) - new BN(MIN_PROTOCOL_BASE_FEE), new BN(receipt['max_priority_fee_per_gas'])])).toString('hex')),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
 					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])),
 				}, data, {});
