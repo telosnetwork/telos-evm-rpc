@@ -1221,6 +1221,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
+			console.log(JSON.stringify(receipt));
 			// EIP 1559
 			if(receipt['max_fee_per_gas']){
 				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
