@@ -1204,7 +1204,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
 				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
 				cumulativeGasUsed: await getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index']),
-				effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
 				logsBloom: _logsBloom,
@@ -1231,6 +1230,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(receipt['max_fee_per_gas']){
 				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
 				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
+				console.log(receipt['max_fee_per_gas']);
+				console.log(receipt['max_priority_fee_per_gas']);
 				data = Object.assign({
 					effectiveGasPrice: removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex')),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
