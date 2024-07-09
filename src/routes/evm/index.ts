@@ -450,7 +450,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						from: finalFrom.toLowerCase(),
 						gas: hexGas,
 						gasPrice: hexGasPrice,
-						effectiveGasPrice: hexGasPrice,
 						hash: receipt['hash'],
 						input: receipt['input_data'],
 						nonce: hexNonce,
@@ -480,12 +479,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						})
 					}
 					if(isEIP1559){
-						console.log(MIN_PROTOCOL_BASE_FEE);
-						console.log(receipt['max_fee_per_gas']);
-						console.log(receipt['max_priority_fee_per_gas'])
-						data = Object.assign({}, data, {
-							effectiveGasPrice: removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex'))
-						})
 						data.type = '0x2';
 					}
 					if(receipt['type']){
@@ -1238,9 +1231,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(receipt['max_fee_per_gas']){
 				// Should we calculate the effective gas price or is it available in receipt thru charged_gas_price ?
 				// Calculation should be block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
-				const effectiveGasPrice = removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex'));
 				data = Object.assign({
-					effectiveGasPrice: removeLeftZeros(toHex(effectiveGasPrice)),
+					effectiveGasPrice: removeLeftZeros((BN(MIN_PROTOCOL_BASE_FEE) + minBN([BN(receipt['max_fee_per_gas']) - BN(MIN_PROTOCOL_BASE_FEE), BN(receipt['max_priority_fee_per_gas'])])).toString('hex')),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
 					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])),
 				}, data, {});
@@ -1276,43 +1268,46 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			gas: removeLeftZeros(toHex(receipt.gas_limit)),
 			hash: receipt['hash'],
 			input: receipt['input_data'],
+			gasPrice: receipt['charged_gas_price'],
 			nonce: removeLeftZeros(toHex(receipt['nonce'])),
 			to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 			transactionIndex: removeLeftZeros(toHex(receipt['trx_index'])),
 			value: removeLeftZeros(receipt['value']),
+			type: '0x0',
 			v: removeLeftZeros(v),
 			r, s
 		};
-		if(receipt['type']){
-			data = Object.assign({
-				type: receipt['type']
-			}, data, {})
-		}
 		if(receipt['access_list']){
 			data = Object.assign({
 				accessList: receipt['access_list']
-			}, data, {})
+			}, data, {});
+			data.type = '0x1';
 		}
 		if(receipt['chain_id']){
 			data = Object.assign({
 				chainId: receipt['chain_id']
 			}, data, {})
 		}
-		if(receipt.charged_gas_price){
-			data = Object.assign({
-				gasPrice: receipt.charged_gas_price,
-				effectiveGasPrice: receipt.charged_gas_price
-			}, data, {})
-		}
+		let isEIP1559 = false;
 		if(receipt['max_fee_per_gas']){
+			isEIP1559 = true;
 			data = Object.assign({
 				maxFeePerGas: receipt['max_fee_per_gas']
 			}, data, {})
 		}
 		if(receipt['max_priority_fee_per_gas']){
+			isEIP1559 = true;
 			data = Object.assign({
 				maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
 			}, data, {})
+		}
+		if(receipt['type']){
+			data = Object.assign({
+				type: receipt['type']
+			}, data, {})
+		}
+		if(isEIP1559){
+			data.type = '0x2';
 		}
 		return receipt;
 	});
