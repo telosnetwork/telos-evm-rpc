@@ -1201,7 +1201,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			let data = {
 				blockHash: _blockHash,
 				blockNumber: removeLeftZeros(toHex(receipt['block'])),
-				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase(),
+				contractAddress: toChecksumAddress(_contractAddr)?.toLowerCase() || null,
 				cumulativeGasUsed: await getCumulativeGasUsed(receipt['block_hash'], receipt['trx_index']),
 				from: toChecksumAddress(receipt['from'])?.toLowerCase(),
 				gasUsed: removeLeftZeros(_gas),
@@ -1223,24 +1223,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 			// EIP 2718
 			if(receipt['access_list']){
-				data = Object.assign({
-					accessList: receipt['access_list']
-				}, data, {});
 				data.type = '0x1';
 			}
 			// EIP 1559
 			if(receipt['max_fee_per_gas']){
-				data = Object.assign({
-					effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
-					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
-					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])),
-				}, data, {});
 				data.type = '0x2';
-			}
-			// EIP 4844
-			// got maxFeePerBlobGas & blobVersionedHashes
-			if(receipt['max_fee_per_blob_gas']){
-				// need blobGasUsed & blobGasPrice
 			}
 			return data;
 		} else {
