@@ -360,11 +360,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			extraData: extraData
 		});
 
-		if(blockDelta['@baseFeePerGas']){
-			block = Object.assign({}, block, {
-				baseFeePerGas: removeLeftZeros(toHex(blockDelta['@baseFeePerGas']))
-			})
-		}
 		return block;
 	}
 
@@ -495,7 +490,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
 
 			// If we didn't get the gas price from transactions (ie: no transactions on block) we get the current gas price
-			// This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data, i
+			// This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data, 
 			// It means we shouldn't change our fixed gas price before 2.0 replaces all of this else historical data on empty blocks will be wrong and show current gas price instead of the one at the time block was written
 			if(hexGasPrice === null){
 				hexGasPrice = removeLeftZeros(toHex(await fastify.evm.getGasPrice()));
@@ -1295,12 +1290,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		if(isEIP1559){
 			data.type = '0x2';
 		}
-		return receipt;
+		return data;
 	});
 
-	function parseTransactionReceipt(){
-		
-	}
 	/**
 	 * Returns information about a transaction by block hash and index
 	 */
