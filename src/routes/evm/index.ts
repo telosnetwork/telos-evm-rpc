@@ -1222,6 +1222,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
+			console.log(JSON.stringify(receipt));
 			// EIP 2718
 			if(receipt['access_list']){
 				data.type = '0x1';
