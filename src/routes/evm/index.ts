@@ -1228,15 +1228,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 			// EIP 1559
 			if(receipt['max_fee_per_gas']){
-				// Calculation for effectiveGasPrice is block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
-				const minProtocolBaseFee = new BN(MIN_PROTOCOL_BASE_FEE);
-				const maxFeePerGas = new BN(receipt['max_fee_per_gas']);
-				const maxPriorityFeePerGas = new BN(receipt['max_priority_fee_per_gas']);
-				console.log(minProtocolBaseFee.toString(), maxFeePerGas.toString(), maxPriorityFeePerGas.toString());
-				const effectiveGasPrice = minProtocolBaseFee.add(minBN([maxFeePerGas.sub(minProtocolBaseFee), maxPriorityFeePerGas])).toString(16);
-				console.log(effectiveGasPrice.toString());
 				data = Object.assign({
-					effectiveGasPrice: removeLeftZeros(effectiveGasPrice),
+					effectiveGasPrice: removeLeftZeros(toHex(receipt['charged_gas_price'])),
 					maxFeePerGas: removeLeftZeros(toHex(receipt['max_fee_per_gas'])),
 					maxPriorityFeePerGas: removeLeftZeros(toHex(receipt['max_priority_fee_per_gas'])),
 				}, data, {});
@@ -1316,6 +1309,9 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		return receipt;
 	});
 
+	function parseTransactionReceipt(){
+		
+	}
 	/**
 	 * Returns information about a transaction by block hash and index
 	 */
