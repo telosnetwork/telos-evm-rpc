@@ -459,6 +459,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						type: '0x0',
 						v, r, s
 					};
+					// EIP 2718
 					if(receipt['access_list']){
 						data = Object.assign({}, data, {
 							accessList: receipt['access_list'],
@@ -482,9 +483,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						data.type = '0x2';
 					}
 					if(receipt['type']){
-						data = Object.assign({}, data, {
-							type: receipt['type']
-						})
+						data.type = receipt['type'];
 					}
 					trxs.push(data);
 				}
@@ -1222,9 +1221,11 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				//errors: receipt['errors'],
 				//output: '0x' + receipt['output']
 			}
-			console.log(JSON.stringify(receipt));
 			// EIP 2718
 			if(receipt['access_list']){
+				data = Object.assign({
+					accessList: receipt['access_list']
+				}, data, {});
 				data.type = '0x1';
 			}
 			// EIP 1559
