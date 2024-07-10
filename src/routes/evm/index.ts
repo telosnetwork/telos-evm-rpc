@@ -1230,8 +1230,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(receipt['max_fee_per_gas']){
 				// Calculation for effectiveGasPrice is block.baseFeePerGas + min(trx.maxFeePerGas - block.baseFeePerGas, trx.maxPriorityFeePerGas).
 				const minProtocolBaseFee = new BN(MIN_PROTOCOL_BASE_FEE);
-				const maxFeePerGas = new BN(toHex(receipt['max_fee_per_gas']));
-				const maxPriorityFeePerGas = new BN(toHex(receipt['max_priority_fee_per_gas']));
+				const maxFeePerGas = new BN(receipt['max_fee_per_gas']);
+				const maxPriorityFeePerGas = new BN(receipt['max_priority_fee_per_gas']);
 				console.log(minProtocolBaseFee.toString(), maxFeePerGas.toString(), maxPriorityFeePerGas.toString());
 				const effectiveGasPrice = minProtocolBaseFee.add(minBN([maxFeePerGas.sub(minProtocolBaseFee), maxPriorityFeePerGas])).toString(16);
 				console.log(effectiveGasPrice.toString());
