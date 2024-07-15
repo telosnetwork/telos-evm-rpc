@@ -354,7 +354,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			hash: blockHash,
 			logsBloom: addHexPrefix(new Bloom().bitvector.toString("hex")),
 			number: blockNumberHex,
-			baseFeePerGas: await fastify.evm.getGasPrice(), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
+			baseFeePerGas: addHexPrefix(removeLeftZeros(await fastify.evm.getGasPrice())), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
 			timestamp: removeLeftZeros(timestamp?.toString(16)),
 			transactions: [],
 			extraData: extraData
