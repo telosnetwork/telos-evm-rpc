@@ -612,6 +612,7 @@ export class TelosEvmApi {
     sender,
     data,
     gasLimit,
+    gasPrice,
     value,
     to,
     accessList,
@@ -624,6 +625,7 @@ export class TelosEvmApi {
     sender?: string
     data?: string
     gasLimit?: string | Buffer
+    gasPrice: string | Buffer
     value?: number | Buffer
     to?: string
     accessList?: any[]
@@ -634,13 +636,28 @@ export class TelosEvmApi {
     chainId?: number | string | Buffer
   }) {
     const nonce = await this.getNonce(sender);
-    const gasPrice = await this.getGasPrice();
-    if(maxPriorityFeePerGas && maxFeePerGas === '0'){
-      maxFeePerGas = gasPrice;
+    const cGasPrice = await this.getGasPrice();
+
+    // If gasPrice is not set, use EIP 1559 by default
+    if(gasPrice === undefined){
+      if(maxPriorityFeePerGas === undefined){
+        maxPriorityFeePerGas = "0x0"; // TelosEVM doesn't require priority fees
+      }
+      if(maxFeePerGas === undefined){
+        maxFeePerGas = cGasPrice;
+      }
     }
-    const txData = {
+
+    // If only one of two EIP 1559 parameter is set, set the other by default as well
+    if(maxPriorityFeePerGas && (!maxFeePerGas || maxFeePerGas === '0' || maxFeePerGas === '0x0')){
+      maxFeePerGas = cGasPrice;
+    }
+    if(maxFeePerGas && !maxPriorityFeePerGas){
+      maxPriorityFeePerGas = '0x0';
+    }
+    
+    let txData = {
         nonce: nonce,
-        gasPrice: `0x${gasPrice.toString(16)}`,
         gasLimit:
             gasLimit !== undefined
                 ? `0x${(gasLimit as any).toString(16)}`
@@ -652,15 +669,22 @@ export class TelosEvmApi {
         to: to,
         data: data,
         chainId: chainId ? chainId : undefined,
-        // EIP 1559
-        maxFeePerGas: maxFeePerGas ? `0x${(maxFeePerGas as any).toString(16)}` : undefined,
-        maxPriorityFeePerGas: maxPriorityFeePerGas ? `0x${(maxPriorityFeePerGas as any).toString(16)}` : undefined,
         // EIP 4844
         maxFeePerBlobGas: maxFeePerBlobGas ? `0x${(maxFeePerBlobGas as any).toString(16)}` : undefined,
         blobVersionedHashes: blobVersionedHashes ? blobVersionedHashes : undefined,
         // EIP 2930
         accessList: accessList ? accessList : undefined
     };
+    if(gasPrice){
+      txData = Object.assign(txData, {gasPrice: `0x${cGasPrice.toString(16)}`});
+    }
+    // EIP 1559
+    if(maxFeePerGas){
+      txData = Object.assign(txData, {maxFeePerGas: `0x${(maxFeePerGas as any).toString(16)}`});
+    }
+    if(maxPriorityFeePerGas){
+      txData = Object.assign(txData, {maxFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`});
+    }
     
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
     let message : Uint8Array[] | Uint8Array = tx.getMessageToSign();

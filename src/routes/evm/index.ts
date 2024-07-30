@@ -450,6 +450,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						nonce: hexNonce,
 						to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 						transactionIndex: hexTransactionIndex,
+						baseFeePerGas: addHexPrefix(removeLeftZeros(await fastify.evm.getGasPrice())), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
 						value: hexValue,
 						type: '0x0',
 						v, r, s
@@ -1778,8 +1779,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	});
 
 	methods.set('eth_maxPriorityFeePerGas', async ([]) => {
-		// As our miners are on Antelope they do not need this fee, so we return the minimum (1) as max
-		return '0x01';
+		// As our BPs are on Antelope they do not need this fee, so we return 0 as max
+		return '0x00';
 	});
 
 	// EIP 4844
