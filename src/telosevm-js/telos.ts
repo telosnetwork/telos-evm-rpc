@@ -625,7 +625,7 @@ export class TelosEvmApi {
     sender?: string
     data?: string
     gasLimit?: string | Buffer
-    gasPrice: string | Buffer
+    gasPrice?: string | Buffer
     value?: number | Buffer
     to?: string
     accessList?: any[]
@@ -657,23 +657,18 @@ export class TelosEvmApi {
     }
     
     let txData = {
-        nonce: nonce,
-        gasLimit:
-            gasLimit !== undefined
-                ? `0x${(gasLimit as any).toString(16)}`
-                : DEFAULT_GAS_LIMIT,
-        value:
-            value !== undefined
-                ? `0x${(value as any).toString(16)}`
-                : DEFAULT_VALUE,
-        to: to,
-        data: data,
-        chainId: chainId ? chainId : undefined,
-        // EIP 4844
-        maxFeePerBlobGas: maxFeePerBlobGas ? `0x${(maxFeePerBlobGas as any).toString(16)}` : undefined,
-        blobVersionedHashes: blobVersionedHashes ? blobVersionedHashes : undefined,
-        // EIP 2930
-        accessList: accessList ? accessList : undefined
+      nonce: nonce,
+      gasLimit:
+          gasLimit !== undefined
+              ? `0x${(gasLimit as any).toString(16)}`
+              : DEFAULT_GAS_LIMIT,
+      value:
+          value !== undefined
+              ? `0x${(value as any).toString(16)}`
+              : DEFAULT_VALUE,
+      to: to,
+      data: data,
+      chainId: chainId ? chainId : undefined,
     };
     if(gasPrice){
       txData = Object.assign(txData, {gasPrice: `0x${cGasPrice.toString(16)}`});
@@ -684,6 +679,17 @@ export class TelosEvmApi {
     }
     if(maxPriorityFeePerGas){
       txData = Object.assign(txData, {maxFeePerGas: `0x${(maxPriorityFeePerGas as any).toString(16)}`});
+    }
+    // EIP 2930
+    if(accessList){
+      txData = Object.assign(txData, {accessList: accessList});
+    }
+    // EIP 4844
+    if(maxFeePerBlobGas){
+      txData = Object.assign(txData, {maxFeePerBlobGas: `0x${(maxFeePerBlobGas as any).toString(16)}`});
+    }
+    if(blobVersionedHashes){
+      txData = Object.assign(txData, {blobVersionedHashes: blobVersionedHashes});
     }
     
     const tx = TransactionFactory.fromTxData(txData, {common: this.chainConfig});
