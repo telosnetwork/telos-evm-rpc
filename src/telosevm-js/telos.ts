@@ -637,17 +637,17 @@ export class TelosEvmApi {
   }) {
     const nonce = await this.getNonce(sender);
     const cGasPrice = await this.getGasPrice();
-
     // If gasPrice is not set, use EIP 1559 by default
     if(!gasPrice){
       if(!maxFeePerGas || maxFeePerGas === '0' || maxFeePerGas === '0x0'){
-        maxFeePerGas = cGasPrice;
+        maxFeePerGas = `0x${cGasPrice.toString(16)}`;
       }
+      gasPrice = `0x${cGasPrice.toString(16)}`;
     }
 
     // If only one of two EIP 1559 parameter is set, set the other by default as well
     if(maxPriorityFeePerGas && (!maxFeePerGas || maxFeePerGas === '0' || maxFeePerGas === '0x0')){
-      maxFeePerGas = cGasPrice;
+      maxFeePerGas = `0x${cGasPrice.toString(16)}`;
     }
     if(maxFeePerGas && !maxPriorityFeePerGas){
       maxPriorityFeePerGas = '0x0'; // TelosEVM doesn't require priority fees so we can set it at 0
