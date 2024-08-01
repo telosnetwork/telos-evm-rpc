@@ -13,7 +13,6 @@ import {
 	BLOCK_GAS_LIMIT,
 	NULL_TRIE, EMPTY_LOGS, removeLeftZeros, leftPadZerosEvenBytes, toLowerCaseAddress, isHexPrefixed,
 	parsePanicReason, parseRevertReason, toOpname,
-	minBN,
 } from "../../util/utils"
 import MyLogger from "../../logging";
 import moment from "moment";
@@ -30,6 +29,7 @@ import {
 import NonceRetryManager from "../../util/NonceRetryManager";
 import {TransactionVars} from "../../telosevm-js/telos";
 import {estypes} from "@elastic/elasticsearch";
+import { TransactionFactory } from "@ethereumjs/tx";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -889,7 +889,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			txParams.data = txParams.input;
 			delete txParams.input;
 		}
-
 		const encodedTx : string = await fastify.evm.createEthTx({
 			sender: txParams.from,
 			gasPrice: await fastify.evm.getGasPrice(),
@@ -1225,6 +1224,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			if(receipt['max_fee_per_gas']){
 				data.type = '0x2';
 			}
+			// EIP 2718
 			if(receipt['type']){
 				data.type = toHex(receipt['type']);
 			}
@@ -1319,7 +1319,25 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Returns information about a block by number.
 	 */
 	methods.set('eth_getBlockByNumber', async ([block, full, client]) => {
-		const blockNumber = parseInt(await toBlockNumber(block), 16);
+		let blockNumber: number;
+		switch (block) {
+			case 'earliest':
+				return GENESIS_BLOCK;
+			case 'latest':
+				blockNumber = Number(await getCurrentBlockNumber(false));
+				break;
+			case 'pending':
+				blockNumber = Number(await getCurrentBlockNumber(false));
+				break;
+			case 'safe':
+				blockNumber = Number(await getCurrentBlockNumber(false));
+				break
+			case 'finalized':
+				blockNumber = (Number(await getCurrentBlockNumber(false))) - Number(2);
+				break
+			default:
+				blockNumber = Number(await toBlockNumber(block));
+		}
 		
 		if (blockNumber === 0)
 			return GENESIS_BLOCK;
@@ -1980,7 +1998,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		const clientInfo = {
 			ip, origin, usage, limit
 		}
-
 		return await doRpcPayload(request.body, clientInfo, reply);
 	});
 }

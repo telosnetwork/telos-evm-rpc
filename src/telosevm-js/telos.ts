@@ -265,6 +265,7 @@ export class TelosEvmApi {
     if (this.debug) {
       console.debug(`In raw, tx is: ${tx}`);
     }
+    const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
     let response: any = {};
     response = await this.transact([
       {
@@ -283,8 +284,6 @@ export class TelosEvmApi {
     if (this.debug) {
       console.debug(`In raw, console is: ${response.processed.action_traces[0].console}`);
     }
-
-    const trx = TransactionFactory.fromSerializedData(Buffer.from(tx, 'hex'), {common: this.chainConfig});
 
     response = Object.assign({
       transactionHash: toHex(trx.hash()),
@@ -665,10 +664,12 @@ export class TelosEvmApi {
               : DEFAULT_VALUE,
       to: to,
       data: data,
-      chainId: chainId ? chainId : undefined,
     };
     if(gasPrice){
       txData = Object.assign(txData, {gasPrice: `0x${cGasPrice.toString(16)}`});
+    }
+    if(chainId){
+      txData = Object.assign(txData, {chainId: chainId });
     }
     // EIP 1559
     if(maxFeePerGas){
