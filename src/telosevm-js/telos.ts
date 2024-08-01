@@ -641,8 +641,8 @@ export class TelosEvmApi {
       if(!maxFeePerGas || maxFeePerGas === '0' || maxFeePerGas === '0x0'){
         maxFeePerGas = `0x${cGasPrice.toString(16)}`;
       }
-      gasPrice = `0x${cGasPrice.toString(16)}`;
     }
+    gasPrice = `0x${cGasPrice.toString(16)}`;
 
     // If only one of two EIP 1559 parameter is set, set the other by default as well
     if(maxPriorityFeePerGas && (!maxFeePerGas || maxFeePerGas === '0' || maxFeePerGas === '0x0')){

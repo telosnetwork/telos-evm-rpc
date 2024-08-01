@@ -891,7 +891,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 		}
 		const encodedTx : string = await fastify.evm.createEthTx({
 			sender: txParams.from,
-			gasPrice: await fastify.evm.getGasPrice(),
 			gasLimit: 10000000000000000,
 			...txParams
 		});
