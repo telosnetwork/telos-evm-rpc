@@ -29,7 +29,6 @@ import {
 import NonceRetryManager from "../../util/NonceRetryManager";
 import {TransactionVars} from "../../telosevm-js/telos";
 import {estypes} from "@elastic/elasticsearch";
-import { TransactionFactory } from "@ethereumjs/tx";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -960,6 +959,13 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	}
 
 	/**
+	 * Returns the current maxPriorityFeePerGas in wei.
+	 */
+	methods.set('eth_maxPriorityFeePerGas ', async () => {
+		return '0x0'; // Our BPs don't need pririoty fee
+	});
+
+	/**
 	 * Returns the current gas price in wei.
 	 */
 	methods.set('eth_gasPrice', async () => {
@@ -1114,6 +1120,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	 * Ethereum network.
 	 */
 	methods.set('eth_sendRawTransaction', async ([signedTx]) => {
+
 		try {
 			const response = await fastify.evm.raw({
 				account: opts.signerAccount,
@@ -1793,9 +1800,24 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	});
 
 	// EIP 1559
-	methods.set('eth_feeHistory', async ([]) => {
+	methods.set('eth_feeHistory', async ([params]) => {
 		// 2.0 
 		throw new Error("eth_feeHistory is not supported yet");
+		// TODO code
+		let history = {
+			oldestBlock: params[0],
+			reward: [],
+			baseFeePerGas: [],
+			gasUsedRatio: [],
+		}
+		const blockCount = (params[0] - params[1]);
+		const gasPrice = await fastify.evm.getGasPrice();
+		for(let i = 0; i < blockCount; i++){
+			history.reward.push(["0x0", "0x0"]);
+			history.baseFeePerGas.push(gasPrice);
+			history.gasUsedRatio.push("1");
+		}
+		return history;
 	});
 
 	methods.set('eth_maxPriorityFeePerGas', async ([]) => {
