@@ -1189,7 +1189,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			blockNumber: removeLeftZeros(_blockNum),
 			from: toChecksumAddress(receipt['from']).toLowerCase(),
 			gas: removeLeftZeros(numToHex(receipt.gas_limit)),
-			gasPrice: removeLeftZeros(numToHex(receipt.charged_gas_price)),
+			gasPrice: removeLeftZeros(numToHex(receipt.gas_price)),
 			hash: receipt['hash'],
 			input: receipt['input_data'],
 			nonce: removeLeftZeros(numToHex(receipt['nonce'])),
