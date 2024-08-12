@@ -239,12 +239,6 @@ export default class WebsocketRPC {
     handleRawMessage(data: any): void {
         for (const [subId, sub] of this.logSubscriptions) {
             const tRef = process.hrtime.bigint();
-            // Check if any of the clients are closed and remove them
-            for(let ws of  sub.wsClients){
-                if(ws[0].readyState !== ws[0].OPEN){
-                    sub.removeWs(ws[0], true);
-                }
-            }
             sub.handleRawAction(data);
             const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
             for(let ws of  sub.wsClients){
@@ -264,12 +258,6 @@ export default class WebsocketRPC {
                     "result": head
                 }
             };
-            // Check if any of the clients are closed and remove them
-            for(let ws of this.headSubscription.wsClients){
-                if(ws[0].readyState !== ws[0].OPEN){
-                    this.headSubscription.removeWs(ws[0], true);
-                }
-            }
             this.headSubscription.publish(JSON.stringify(headMessage));
             const duration = ((Number(process.hrtime.bigint()) - Number(tRef)) / 1000).toFixed(3);
             for(let ws of this.headSubscription.wsClients){
