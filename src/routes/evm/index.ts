@@ -424,6 +424,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						return null;
 					}
 				}
+				console.log(block);
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
