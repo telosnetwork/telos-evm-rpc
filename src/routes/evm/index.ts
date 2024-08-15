@@ -498,7 +498,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
-			let blockObj = Object.assign({}, {
+			let blockObj = Object.assign({}, BLOCK_TEMPLATE, {
 				gasUsed: gasUsedBlock,
 				gasLimit: BLOCK_GAS_LIMIT,
 				parentHash: parentHash,
@@ -512,7 +512,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 				baseFeePerGas: hexGasPrice,
 				receiptsRoot: addHexPrefix(block['@receiptsRootHash']),
 				transactionsRoot: addHexPrefix(block['@transactionsRoot'])
-			}, BLOCK_TEMPLATE);
+			});
 			return blockObj;
 		} catch (e) {
 			Logger.error(client.ip + JSON.stringify(e));
