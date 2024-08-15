@@ -449,7 +449,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						nonce: hexNonce,
 						to: toChecksumAddress(receipt['to'])?.toLowerCase(),
 						transactionIndex: hexTransactionIndex,
-						baseFeePerGas: addHexPrefix(removeLeftZeros(await fastify.evm.getGasPrice())), // This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data
 						value: hexValue,
 						type: '0x0',
 						v, r, s
@@ -1803,19 +1802,31 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 	methods.set('eth_feeHistory', async ([params]) => {
 		// 2.0 
 		throw new Error("eth_feeHistory is not supported yet");
+		const oldestBlock = params[0];
+		const blockCount = params[1];
+		const rewardPercentiles = params[2];
+
 		// TODO code
 		let history = {
 			oldestBlock: params[0],
 			reward: [],
 			baseFeePerGas: [],
 			gasUsedRatio: [],
+			baseFeePerBlobGas: [],
+			blobGasUsedRatio: []
 		}
-		const blockCount = (params[0] - params[1]);
+		// get blocks data in batch
 		const gasPrice = await fastify.evm.getGasPrice();
 		for(let i = 0; i < blockCount; i++){
-			history.reward.push(["0x0", "0x0"]);
+			if(rewardPercentiles.length > 0){
+				history.reward.push(["0x0", "0x0"]);
+			}
+			// get baseFeePerGas for block data
 			history.baseFeePerGas.push(gasPrice);
+			// calculate gasUsedRatio
 			history.gasUsedRatio.push("1");
+			history.baseFeePerBlobGas.push("0x0");
+			history.blobGasUsedRatio.push("0");
 		}
 		return history;
 	});
