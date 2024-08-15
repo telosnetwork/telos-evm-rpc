@@ -424,7 +424,6 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 						return null;
 					}
 				}
-				console.log(block);
 				if (receipt['logsBloom']){
 					bloom.or(new Bloom(Buffer.from(receipt['logsBloom'], "hex")));
 				}
@@ -489,6 +488,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			const extraData = addHexPrefix(block['@blockHash']);
 			const blockSize = addHexPrefix(block['size'].toString(16));
 			const parentHash = addHexPrefix(block['@evmPrevBlockHash']);
+			console.log("Parent hash: " + parentHash);
 
 			// If we didn't get the gas price from transactions (ie: no transactions on block) we get the current gas price
 			// This is a fix because we do not save baseFeePerGas on blocks in translator and do not have easy access to historical gas price data, 
@@ -498,7 +498,7 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			}
 
 			logsBloom = addHexPrefix(bloom.bitvector.toString("hex"));
-			let blockObj = Object.assign({
+			let blockObj = Object.assign({}, {
 				gasUsed: gasUsedBlock,
 				gasLimit: BLOCK_GAS_LIMIT,
 				parentHash: parentHash,
