@@ -1269,36 +1269,36 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			r, s
 		};
 		if(receipt['access_list']){
-			data = Object.assign({
+			data = Object.assign({}, data, {
 				accessList: receipt['access_list']
-			}, data);
+			});
 			data.type = '0x1';
 		}
 		if(receipt['chain_id']){
-			data = Object.assign({
+			data = Object.assign({}, data, {
 				chainId: receipt['chain_id']
-			}, data)
+			})
 		}
 		let isEIP1559 = false;
 		if(receipt['max_fee_per_gas']){
 			isEIP1559 = true;
-			data = Object.assign({
+			data = Object.assign({}, data, {
 				maxFeePerGas: receipt['max_fee_per_gas']
-			}, data)
+			})
 		}
 		if(receipt['max_priority_fee_per_gas']){
 			isEIP1559 = true;
-			data = Object.assign({
+			data = Object.assign({}, data, {
 				maxPriorityFeePerGas: receipt['max_priority_fee_per_gas']
-			}, data)
+			})
 		}
 		if(isEIP1559){
 			data.type = '0x2';
 		}
 		if(receipt['type']){
-			data = Object.assign({
+			data = Object.assign({}, data, {
 				type: receipt['type']
-			}, data)
+			})
 		}
 		return data;
 	});
