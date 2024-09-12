@@ -30,6 +30,7 @@ import {
 import NonceRetryManager from "../../util/NonceRetryManager";
 import {TransactionVars} from "../../telosevm-js/telos";
 import {estypes} from "@elastic/elasticsearch";
+import {DEFAULT_GAS_LIMIT} from "../../telosevm-js/constants";
 
 const BN = require('bn.js');
 const GAS_PRICE_OVERESTIMATE = 1.00
@@ -973,6 +974,8 @@ export default async function (fastify: FastifyInstance, opts: TelosEvmConfig) {
 			value: _value.toHexString().replace(/^0x/, ''),
 			sender: txParams.from,
 		};
+		obj.gas = obj.gasLimit || obj.gas || DEFAULT_GAS_LIMIT;
+		delete obj.gasLimit;
 		let tx = await fastify.evm.createEthTx(obj);
 		let sender = txParams.from
 
