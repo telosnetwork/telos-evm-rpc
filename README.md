@@ -1,4 +1,6 @@
-# Telos EVM RPC
+# ARCHIVED
+# 2.0 IS RELEASED, INSTALLATION INSTRUCTIONS [HERE](https://github.com/telosnetwork/telos-evm-installer)
+## Telos EVM RPC 1.5
 
 Required plugin config at config.json
 
